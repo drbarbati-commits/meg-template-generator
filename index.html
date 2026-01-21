@@ -1,1 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vascular Graft Template Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .workspace {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .panel {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            background: #fafafa;
+        }
+        .panel h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            cursor: crosshair;
+            background: white;
+        }
+        .fenestration-list {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .fenestration-item {
+            background: #e8f4fd;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .btn-danger {
+            background: #dc3545;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        input, select {
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .print-section {
+            margin-top: 20px;
+            padding: 20px;
+            border: 2px dashed #007bff;
+            border-radius: 8px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Vascular Graft Template Generator</h1>
+            <p>Proof of Concept - Design fenestrations and generate printable templates</p>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>Graft Diameter (mm):</label>
+                <select id="graftDiameter">
+                    <option value="20">20mm</option>
+                    <option value="24">24mm</option>
+                    <option value="28" selected>28mm</option>
+                    <option value="32">32mm</option>
+                    <option value="36">36mm</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Graft Length (mm):</label>
+                <input type="number" id="graftLength" value="120" min="80" max="200">
+            </div>
+            <div class="control-group">
+                <label>Fenestration Size (mm):</label>
+                <input type="number" id="fenestrationSize" value="6" min="4" max="12">
+            </div>
+            <button class="btn" onclick="updateGraft()">Update Graft</button>
+            <button class="btn btn-danger" onclick="clearFenestrations()">Clear All</button>
+        </div>
+
+        <div class="workspace">
+            <div class="panel">
+                <h3>3D Graft View</h3>
+                <p>Click to add fenestrations</p>
+                <canvas id="graftCanvas" width="400" height="300"></canvas>
+                <div class="fenestration-list" id="fenestrationList">
+                    <strong>Fenestrations:</strong>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>2D Template (Unwrapped)</h3>
+                <p>Printable template</p>
+                <canvas id="templateCanvas" width="400" height="300"></canvas>
+                <div style="margin-top: 10px;">
+                    <small>Scale: <span id="scaleInfo">1:1</span></small>
+                </div>
+            </div>
+        </div>
+
+        <div class="print-section">
+            <h3>Print Instructions</h3>
+            <p>1. Ensure printer is set to "Actual Size" or "100%" scale</p>
+            <p>2. Use standard A4/Letter paper</p>
+            <p>3. Sterilize printed template before use</p>
+            <button class="btn" onclick="printTemplate()">Print Template</button>
+        </div>
+    </div>
+
+    <script>
+        let graftDiameter = 28;
+        let graftLength = 120;
+        let fenestrationSize = 6;
+        let fenestrations = [];
+
+        const graftCanvas = document.getElementById('graftCanvas');
+        const graftCtx = graftCanvas.getContext('2d');
+        const templateCanvas = document.getElementById('templateCanvas');
+        const templateCtx = templateCanvas.getContext('2d');
+
+        function updateGraft() {
+            graftDiameter = parseInt(document.getElementById('graftDiameter').value);
+            graftLength = parseInt(document.getElementById('graftLength').value);
+            fenestrationSize = parseInt(document.getElementById('fenestrationSize').value);
+            drawGraft();
+            drawTemplate();
+        }
+
+        function drawGraft() {
+            graftCtx.clearRect(0, 0, graftCanvas.width, graftCanvas.height);
+            
+            // Draw 3D-like cylinder
+            const centerX = graftCanvas.width / 2;
+            const centerY = graftCanvas.height / 2;
+            const radiusX = 80;
+            const radiusY = 30;
+            const height = 200;
+
+            // Draw cylinder
+            graftCtx.strokeStyle = '#333';
+            graftCtx.lineWidth = 2;
+            
+            // Top ellipse
+            graftCtx.beginPath();
+            graftCtx.ellipse(centerX, centerY - height/2, radiusX, radiusY, 0, 0, 2 * Math.PI);
+            graftCtx.stroke();
+            
+            // Bottom ellipse
+            graftCtx.beginPath();
+            graftCtx.ellipse(centerX, centerY + height/2, radiusX, radiusY, 0, 0, 2 * Math.PI);
+            graftCtx.stroke();
+            
+            // Side lines
+            graftCtx.beginPath();
+            graftCtx.moveTo(centerX - radiusX, centerY - height/2);
+            graftCtx.lineTo(centerX - radiusX, centerY + height/2);
+            graftCtx.moveTo(centerX + radiusX, centerY - height/2);
+            graftCtx.lineTo(centerX + radiusX, centerY + height/2);
+            graftCtx.stroke();
+
+            // Draw fenestrations
+            fenestrations.forEach((fen, index) => {
+                const x = centerX + (fen.angle / 360) * radiusX * 2 - radiusX;
+                const y = centerY - height/2 + (fen.position / graftLength) * height;
+                
+                graftCtx.fillStyle = 'red';
+                graftCtx.beginPath();
+                graftCtx.arc(x, y, 5, 0, 2 * Math.PI);
+                graftCtx.fill();
+                
+                graftCtx.fillStyle = 'black';
+                graftCtx.font = '12px Arial';
+                graftCtx.fillText(`F${index + 1}`, x + 8, y + 4);
+            });
+
+            updateFenestrationList();
+        }
+
+        function drawTemplate() {
+            templateCtx.clearRect(0, 0, templateCanvas.width, templateCanvas.height);
+            
+            // Calculate scale to fit canvas
+            const circumference = Math.PI * graftDiameter;
+            const scaleX = templateCanvas.width / circumference;
+            const scaleY = templateCanvas.height / graftLength;
+            const scale = Math.min(scaleX, scaleY) * 0.8;
+            
+            const rectWidth = circumference * scale;
+            const rectHeight = graftLength * scale;
+            const startX = (templateCanvas.width - rectWidth) / 2;
+            const startY = (templateCanvas.height - rectHeight) / 2;
+
+            // Draw template rectangle
+            templateCtx.strokeStyle = '#333';
+            templateCtx.lineWidth = 2;
+            templateCtx.strokeRect(startX, startY, rectWidth, rectHeight);
+            
+            // Draw grid lines
+            templateCtx.strokeStyle = '#ddd';
+            templateCtx.lineWidth = 1;
+            for (let i = 1; i < 4; i++) {
+                const x = startX + (rectWidth / 4) * i;
+                templateCtx.beginPath();
+                templateCtx.moveTo(x, startY);
+                templateCtx.lineTo(x, startY + rectHeight);
+                templateCtx.stroke();
+            }
+
+            // Draw fenestrations
+            fenestrations.forEach((fen, index) => {
+                const x = startX + (fen.angle / 360) * rectWidth;
+                const y = startY + (fen.position / graftLength) * rectHeight;
+                const radius = (fenestrationSize / 2) * scale;
+                
+                templateCtx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+                templateCtx.strokeStyle = 'red';
+                templateCtx.lineWidth = 2;
+                templateCtx.beginPath();
+                templateCtx.arc(x, y, radius, 0, 2 * Math.PI);
+                templateCtx.fill();
+                templateCtx.stroke();
+                
+                templateCtx.fillStyle = 'black';
+                templateCtx.font = '10px Arial';
+                templateCtx.fillText(`F${index + 1}`, x + radius + 2, y + 3);
+            });
+
+            // Update scale info
+            document.getElementById('scaleInfo').textContent = `${scale.toFixed(2)}:1`;
+        }
+
+        function updateFenestrationList() {
+            const list = document.getElementById('fenestrationList');
+            list.innerHTML = '<strong>Fenestrations:</strong>';
+            
+            fenestrations.forEach((fen, index) => {
+                const item = document.createElement('div');
+                item.className = 'fenestration-item';
+                item.innerHTML = `
+                    <strong>F${index + 1}:</strong> 
+                    Position: ${fen.position.toFixed(1)}mm from top, 
+                    Angle: ${fen.angle.toFixed(1)}°, 
+                    Size: ${fenestrationSize}mm
+                    <button onclick="removeFenestration(${index})" style="float: right; font-size: 10px;">×</button>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function removeFenestration(index) {
+            fenestrations.splice(index, 1);
+            drawGraft();
+            drawTemplate();
+        }
+
+        function clearFenestrations() {
+            fenestrations = [];
+            drawGraft();
+            drawTemplate();
+        }
+
+        function printTemplate() {
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>Graft Template</title>
+                        <style>
+                            @media print {
+                                body { margin: 0; }
+                                canvas { max-width: 100%; height: auto; }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <h3>Vascular Graft Template</h3>
+                        <p>Graft: ${graftDiameter}mm × ${graftLength}mm</p>
+                        <canvas width="${templateCanvas.width}" height="${templateCanvas.height}"></canvas>
+                        <script>
+                            const canvas = document.querySelector('canvas');
+                            const ctx = canvas.getContext('2d');
+                            const img = new Image();
+                            img.onload = function() {
+                                ctx.drawImage(img, 0, 0);
+                                window.print();
+                            };
+                            img.src = '${templateCanvas.toDataURL()}';
+                        </script>
+                    </body>
+                </html>
+            `);
+        }
+
+        // Canvas click handler
+        graftCanvas.addEventListener('click', function(e) {
+            const rect = graftCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const centerX = graftCanvas.width / 2;
+            const centerY = graftCanvas.height / 2;
+            const height = 200;
+            
+            // Convert click to fenestration parameters
+            const angle = ((x - centerX + 80) / 160) * 360;
+            const position = ((y - (centerY - height/2)) / height) * graftLength;
+            
+            if (angle >= 0 && angle <= 360 && position >= 0 && position <= graftLength) {
+                fenestrations.push({
+                    angle: angle,
+                    position: position
+                });
+                drawGraft();
+                drawTemplate();
+            }
+        });
+
+        // Initialize
+        updateGraft();
+    </script>
+</body>
+</html>
 
