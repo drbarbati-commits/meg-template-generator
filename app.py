@@ -146,16 +146,14 @@ with col1:
     ax1.text(-95, 100, "9", fontsize=9, ha='center', va='center', color='blue')
     ax1.text(95, 100, "3", fontsize=9, ha='center', va='center', color='blue')
     
-    # Y-axis labels (distance from top) - moved further outward
+    # Y-axis labels (distance from top) - dotted lines extend to numbers
     y_ticks = [0, graft_length//4, graft_length//2, 3*graft_length//4, graft_length]
     for tick in y_ticks:
         y_pos = 100 - (tick / graft_length) * 200
-        # Draw gray dotted line across the graft
-        ax1.plot([-80, 80], [y_pos, y_pos], color='gray', linestyle=':', linewidth=1, alpha=0.6)
-        # Text label moved further outward
+        # Draw gray dotted line from left edge through graft to the number
+        ax1.plot([-80, 120], [y_pos, y_pos], color='gray', linestyle=':', linewidth=1, alpha=0.6)
+        # Text label
         ax1.text(125, y_pos, f"{tick}", fontsize=9, ha='left', va='center', color='darkgreen')
-        # Small tick mark
-        ax1.plot([85, 95], [y_pos, y_pos], 'g-', linewidth=1.5, alpha=0.7)
     
     ax1.text(140, 0, "mm", fontsize=9, ha='left', va='center', color='darkgreen', rotation=90)
     
