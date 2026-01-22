@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from matplotlib.patches import Circle, Rectangle
+from matplotlib.patches import Circle, Rectangle, Arc
 from PIL import Image
 import io
 
@@ -16,12 +16,12 @@ st.set_page_config(
 # Logo path (local file in main directory)
 LOGO_PATH = "logo.png"
 
-# Vessel name options
+# Vessel name options - REORDERED: RRA before LRA
 VESSEL_OPTIONS = [
     "Celiac Trunk",
     "SMA",
-    "LRA",
     "RRA",
+    "LRA",
     "IMA",
     "F1",
     "F2",
@@ -71,6 +71,10 @@ def clock_to_x_fraction(clock_position):
     elif clock_position == 5:
         return 11/12
     return 0.5
+
+# Function to check if fenestration is behind the graft (posterior side)
+def is_behind_graft(clock_position):
+    return clock_position in [4, 5, 6, 7, 8]
 
 # Function to load logo from local file
 @st.cache_data
@@ -128,17 +132,32 @@ with col1:
     ax1.set_xlim(-150, 160)
     ax1.set_ylim(-160, 160)
     
-    # Draw cylinder
-    ellipse_top = patches.Ellipse((0, 100), 160, 60, linewidth=2, 
-                                 edgecolor='black', facecolor='lightblue', alpha=0.3)
-    ax1.add_patch(ellipse_top)
+    # Draw cylinder body (sides)
+    ax1.plot([-80, -80], [-100, 100], 'k-', linewidth=2)
+    ax1.plot([80, 80], [-100, 100], 'k-', linewidth=2)
     
+    # Draw bottom ellipse (fully visible, same color as shaft)
     ellipse_bottom = patches.Ellipse((0, -100), 160, 60, linewidth=2, 
                                    edgecolor='black', facecolor='lightblue', alpha=0.3)
     ax1.add_patch(ellipse_bottom)
     
-    ax1.plot([-80, -80], [-100, 100], 'k-', linewidth=2)
-    ax1.plot([80, 80], [-100, 100], 'k-', linewidth=2)
+    # Draw top ellipse - FRONT HALF (solid line, same color as shaft)
+    # Front arc: from -90 to 90 degrees (right to left, top half)
+    arc_front = Arc((0, 100), 160, 60, angle=0, theta1=-90, theta2=90, 
+                    linewidth=2, edgecolor='black', fill=False)
+    ax1.add_patch(arc_front)
+    
+    # Fill the top ellipse with same color as shaft
+    ellipse_top_fill = patches.Ellipse((0, 100), 160, 60, linewidth=0, 
+                                       facecolor='lightblue', alpha=0.3, zorder=1)
+    ax1.add_patch(ellipse_top_fill)
+    
+    # Draw top ellipse - BACK HALF (dotted line to show it's behind)
+    # Back arc: from 90 to 270 degrees (left to right, bottom half)
+    theta = np.linspace(np.pi/2, 3*np.pi/2, 100)
+    x_back = 80 * np.cos(theta)
+    y_back = 100 + 30 * np.sin(theta)
+    ax1.plot(x_back, y_back, 'k:', linewidth=2, alpha=0.6)
     
     # Clock position labels
     ax1.text(0, 135, "12", fontsize=9, ha='center', va='center', color='blue')
@@ -157,34 +176,67 @@ with col1:
     
     ax1.text(140, 0, "mm", fontsize=9, ha='left', va='center', color='darkgreen', rotation=90)
     
-    # Draw fenestrations
+    # Draw fenestrations BEHIND the graft first (lower z-order)
     for i, fen in enumerate(st.session_state.fenestrations):
-        clock = fen['clock']
-        if clock == 12:
-            x = 0
-        elif clock == 9:
-            x = -80
-        elif clock == 3:
-            x = 80
-        elif clock == 6:
-            x = 0
-        elif clock in [10, 11]:
-            x = -80 + (clock - 9) * (80 / 3)
-        elif clock in [1, 2]:
-            x = clock * (80 / 3)
-        elif clock in [4, 5]:
-            x = 80 - (clock - 3) * (80 / 3)
-        elif clock in [7, 8]:
-            x = -80 + (9 - clock) * (80 / 3)
-        else:
-            x = 0
-        
-        y = 100 - (fen['position'] / graft_length) * 200
-        
-        circle = Circle((x, y), 8, color='red', alpha=0.7)
-        ax1.add_patch(circle)
-        short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
-        ax1.text(x + 12, y, short_name, fontsize=10, fontweight='bold')
+        if is_behind_graft(fen['clock']):
+            clock = fen['clock']
+            if clock == 12:
+                x = 0
+            elif clock == 9:
+                x = -80
+            elif clock == 3:
+                x = 80
+            elif clock == 6:
+                x = 0
+            elif clock in [10, 11]:
+                x = -80 + (clock - 9) * (80 / 3)
+            elif clock in [1, 2]:
+                x = clock * (80 / 3)
+            elif clock in [4, 5]:
+                x = 80 - (clock - 3) * (80 / 3)
+            elif clock in [7, 8]:
+                x = -80 + (9 - clock) * (80 / 3)
+            else:
+                x = 0
+            
+            y = 100 - (fen['position'] / graft_length) * 200
+            
+            # 50% transparency for fenestrations behind the graft
+            circle = Circle((x, y), 8, color='red', alpha=0.35, zorder=2)
+            ax1.add_patch(circle)
+            short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
+            ax1.text(x + 12, y, short_name, fontsize=10, fontweight='bold', alpha=0.5)
+    
+    # Draw fenestrations IN FRONT of the graft (higher z-order)
+    for i, fen in enumerate(st.session_state.fenestrations):
+        if not is_behind_graft(fen['clock']):
+            clock = fen['clock']
+            if clock == 12:
+                x = 0
+            elif clock == 9:
+                x = -80
+            elif clock == 3:
+                x = 80
+            elif clock == 6:
+                x = 0
+            elif clock in [10, 11]:
+                x = -80 + (clock - 9) * (80 / 3)
+            elif clock in [1, 2]:
+                x = clock * (80 / 3)
+            elif clock in [4, 5]:
+                x = 80 - (clock - 3) * (80 / 3)
+            elif clock in [7, 8]:
+                x = -80 + (9 - clock) * (80 / 3)
+            else:
+                x = 0
+            
+            y = 100 - (fen['position'] / graft_length) * 200
+            
+            # Full opacity for fenestrations in front
+            circle = Circle((x, y), 8, color='red', alpha=0.7, zorder=3)
+            ax1.add_patch(circle)
+            short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
+            ax1.text(x + 12, y, short_name, fontsize=10, fontweight='bold')
     
     ax1.text(0, 150, "TOP (Proximal) - 0mm", fontsize=10, ha='center', color='green', fontweight='bold')
     ax1.text(0, -145, f"BOTTOM (Distal) - {graft_length}mm", fontsize=10, ha='center', color='green', fontweight='bold')
@@ -289,7 +341,8 @@ if st.session_state.fenestrations:
     for orig_idx, fen in sorted_fens:
         col_a, col_b = st.columns([4, 1])
         with col_a:
-            st.write(f"**{fen['vessel']}:** Position: {fen['position']:.1f}mm from top, Clock: {fen['clock']} o'clock, Size: {fenestration_size}mm")
+            behind_text = " (Behind graft)" if is_behind_graft(fen['clock']) else ""
+            st.write(f"**{fen['vessel']}:** Position: {fen['position']:.1f}mm from top, Clock: {fen['clock']} o'clock, Size: {fenestration_size}mm{behind_text}")
         with col_b:
             if st.button(f"Delete", key=f"del_{orig_idx}"):
                 st.session_state.fenestrations.pop(orig_idx)
@@ -304,13 +357,13 @@ with col_ref1:
     |--------------|-----------|
     | CT | Celiac Trunk |
     | SMA | Superior Mesenteric Artery |
-    | LRA | Left Renal Artery |
+    | RRA | Right Renal Artery |
     """)
 with col_ref2:
     st.markdown("""
     | Abbreviation | Full Name |
     |--------------|-----------|
-    | RRA | Right Renal Artery |
+    | LRA | Left Renal Artery |
     | IMA | Inferior Mesenteric Artery |
     | F1-F5 | Custom Fenestrations |
     """)
@@ -323,6 +376,8 @@ st.markdown("""
 | 6 | 7 | 8 | 9 | 10 | 11 | **12** | 1 | 2 | 3 | 4 | 5 | 6 |
 |---|---|---|---|----|----|--------|---|---|---|---|---|---|
 | Posterior | | | Right | | | **Anterior** | | | Left | | | Posterior |
+
+**Note:** Fenestrations at positions 4, 5, 6, 7, 8 o'clock appear behind the graft (shown with reduced opacity)
 """)
 
 # Print instructions
