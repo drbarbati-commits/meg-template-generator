@@ -40,24 +40,40 @@ VESSEL_SHORT_NAMES = {
     "F5": "F5"
 }
 
-# Function to convert clock position to degrees for 2D template
-# Template layout: 9 o'clock on LEFT, 12 in CENTER, 3 o'clock on RIGHT
-def clock_to_template_position(clock_position, circumference):
-    # We want: 9=left edge (0), 12=center (circumference/2), 3=right edge (circumference)
-    # Clock positions: 9, 10, 11, 12, 1, 2, 3 map to 0 -> circumference
-    # And 3, 4, 5, 6, 7, 8, 9 wrap around
+# Function to convert clock position to X position on 2D template
+# Template: 9 o'clock = LEFT (0), 12 o'clock = CENTER (0.5), 3 o'clock = RIGHT (1.0)
+def clock_to_x_fraction(clock_position):
+    # Clock face unwrapped: 9 -> 10 -> 11 -> 12 -> 1 -> 2 -> 3
+    # Maps to X fraction:   0 -> 1/6 -> 2/6 -> 3/6 -> 4/6 -> 5/6 -> 6/6
     
-    # Map clock to position where 9=0, 12=0.5, 3=1.0 (as fraction of circumference)
-    if clock_position >= 9:
-        # 9=0, 10=1/12, 11=2/12, 12=3/12
-        fraction = (clock_position - 9) / 12
-    else:
-        # 1=4/12, 2=5/12, 3=6/12, 4=7/12, 5=8/12, 6=9/12, 7=10/12, 8=11/12
-        fraction = (clock_position + 3) / 12
+    if clock_position == 9:
+        return 0.0
+    elif clock_position == 10:
+        return 1/6
+    elif clock_position == 11:
+        return 2/6
+    elif clock_position == 12:
+        return 3/6  # Center = 0.5
+    elif clock_position == 1:
+        return 4/6
+    elif clock_position == 2:
+        return 5/6
+    elif clock_position == 3:
+        return 6/6  # Right edge = 1.0
+    elif clock_position == 4:
+        return 7/6  # Beyond 3, wraps but we show it
+    elif clock_position == 5:
+        return 8/6
+    elif clock_position == 6:
+        return 9/6  # This would be at 1.5 (off the main template)
+    elif clock_position == 7:
+        return -2/6  # Before 9
+    elif clock_position == 8:
+        return -1/6
     
-    return fraction * circumference
+    return 0.5  # Default to center
 
-# Function to get available vessel options (exclude already used ones)
+# Function to get available vessel options
 def get_available_vessels():
     used_vessels = [fen['vessel'] for fen in st.session_state.fenestrations]
     available = []
@@ -103,9 +119,6 @@ with col1:
     ax1.set_ylim(-150, 150)
     ax1.set_aspect('equal')
     
-    # TOP of graft at y = 100 (top of image)
-    # BOTTOM of graft at y = -100 (bottom of image)
-    
     # Top ellipse (proximal end)
     ellipse_top = patches.Ellipse((0, 100), 160, 60, linewidth=2, 
                                  edgecolor='black', facecolor='lightblue', alpha=0.3)
@@ -130,14 +143,25 @@ with col1:
     for i, fen in enumerate(st.session_state.fenestrations):
         clock = fen['clock']
         # Map clock to x position: 9=-80, 12=0, 3=80
-        if clock >= 9:
-            x = -80 + ((clock - 9) / 3) * 80  # 9->-80, 12->0
-        elif clock <= 3:
-            x = (clock / 3) * 80  # 0->0, 3->80
+        if clock == 12:
+            x = 0
+        elif clock == 9:
+            x = -80
+        elif clock == 3:
+            x = 80
+        elif clock == 6:
+            x = 0  # Back/front center
+        elif clock in [10, 11]:
+            x = -80 + (clock - 9) * (80 / 3)  # 10->-53, 11->-27
+        elif clock in [1, 2]:
+            x = clock * (80 / 3)  # 1->27, 2->53
+        elif clock in [4, 5]:
+            x = 80 - (clock - 3) * (80 / 3)  # 4->53, 5->27
+        elif clock in [7, 8]:
+            x = -80 + (9 - clock) * (80 / 3)  # 8->-53, 7->-27
         else:
-            x = 80 - ((clock - 3) / 6) * 160  # 3->80, 6->0, 9->-80
+            x = 0
         
-        # position from top: 0 -> y=100, graft_length -> y=-100
         y = 100 - (fen['position'] / graft_length) * 200
         
         circle = Circle((x, y), 8, color='red', alpha=0.7)
@@ -145,7 +169,6 @@ with col1:
         short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
         ax1.text(x + 12, y, short_name, fontsize=10, fontweight='bold')
     
-    # Labels
     ax1.text(0, 145, "TOP (Proximal)", fontsize=10, ha='center', color='green', fontweight='bold')
     ax1.text(0, -140, "BOTTOM (Distal)", fontsize=10, ha='center', color='green', fontweight='bold')
     
@@ -187,46 +210,66 @@ with col1:
 
 with col2:
     st.subheader("2D Template (Unwrapped)")
-    st.markdown("*Printable template - 9 o'clock at left, 12 at center, 3 at right*")
+    st.markdown("*Printable template - Anterior view (9-12-3)*")
     
     # Calculate dimensions
     circumference = np.pi * graft_diameter
+    half_circ = circumference / 2  # We show half the circumference (9 to 3 via 12)
     
     # Create 2D template
     fig2, ax2 = plt.subplots(figsize=(10, 8))
     
-    # Draw template rectangle
-    rect = Rectangle((0, 0), circumference, graft_length, 
+    # Draw template rectangle (showing 9 to 3 via 12 = half circumference)
+    rect = Rectangle((0, 0), half_circ, graft_length, 
                     linewidth=2, edgecolor='black', facecolor='lightgray', alpha=0.3)
     ax2.add_patch(rect)
     
-    # Draw clock position markers: 9 at left, 12 at center, 3 at right, 6 at edges
-    clock_markers = [
-        (9, 0),                      # 9 o'clock at left edge
-        (12, circumference / 2),     # 12 o'clock at center
-        (3, circumference),          # 3 o'clock at right edge
-        (6, circumference / 4),      # 6 o'clock between 9 and 12
-    ]
-    
-    # Add second 6 o'clock marker on the other side
-    ax2.axvline(x=0, color='blue', linestyle='--', linewidth=1, alpha=0.5)
-    ax2.text(0, graft_length + 5, "9", fontsize=10, ha='center', color='blue', fontweight='bold')
-    
-    ax2.axvline(x=circumference/4, color='blue', linestyle='--', linewidth=1, alpha=0.3)
-    ax2.text(circumference/4, graft_length + 5, "6", fontsize=9, ha='center', color='blue')
-    
-    ax2.axvline(x=circumference/2, color='blue', linestyle='--', linewidth=1, alpha=0.5)
-    ax2.text(circumference/2, graft_length + 5, "12", fontsize=10, ha='center', color='blue', fontweight='bold')
-    
-    ax2.axvline(x=3*circumference/4, color='blue', linestyle='--', linewidth=1, alpha=0.3)
-    ax2.text(3*circumference/4, graft_length + 5, "6", fontsize=9, ha='center', color='blue')
-    
-    ax2.axvline(x=circumference, color='blue', linestyle='--', linewidth=1, alpha=0.5)
-    ax2.text(circumference, graft_length + 5, "3", fontsize=10, ha='center', color='blue', fontweight='bold')
+    # Clock position markers - evenly spaced from 9 to 3
+    # 9=0, 10=1/6, 11=2/6, 12=3/6(center), 1=4/6, 2=5/6, 3=6/6
+    clock_labels = [9, 10, 11, 12, 1, 2, 3]
+    for i, clock in enumerate(clock_labels):
+        x = (i / 6) * half_circ
+        if clock in [9, 12, 3]:
+            ax2.axvline(x=x, color='blue', linestyle='--', linewidth=1.5, alpha=0.7)
+            ax2.text(x, graft_length + 5, str(clock), fontsize=11, ha='center', color='blue', fontweight='bold')
+        else:
+            ax2.axvline(x=x, color='lightblue', linestyle=':', linewidth=1, alpha=0.5)
+            ax2.text(x, graft_length + 5, str(clock), fontsize=9, ha='center', color='gray')
     
     # Draw fenestrations
     for i, fen in enumerate(st.session_state.fenestrations):
-        x = clock_to_template_position(fen['clock'], circumference)
+        clock = fen['clock']
+        
+        # Calculate x position based on clock
+        # Only show fenestrations from 9 to 3 (via 12) on this template
+        if clock == 9:
+            x_frac = 0
+        elif clock == 10:
+            x_frac = 1/6
+        elif clock == 11:
+            x_frac = 2/6
+        elif clock == 12:
+            x_frac = 3/6
+        elif clock == 1:
+            x_frac = 4/6
+        elif clock == 2:
+            x_frac = 5/6
+        elif clock == 3:
+            x_frac = 6/6
+        elif clock == 4:
+            x_frac = 7/6  # Slightly beyond 3
+        elif clock == 5:
+            x_frac = 8/6
+        elif clock == 6:
+            x_frac = 9/6  # Far right (posterior)
+        elif clock == 7:
+            x_frac = -2/6  # Far left (posterior)
+        elif clock == 8:
+            x_frac = -1/6
+        else:
+            x_frac = 3/6
+        
+        x = x_frac * half_circ
         y = graft_length - fen['position']
         
         circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.7)
@@ -235,11 +278,11 @@ with col2:
         ax2.text(x + fenestration_size/2 + 2, y, short_name, fontsize=10, fontweight='bold')
     
     ax2.set_aspect('equal')
-    ax2.set_xlim(-5, circumference + 15)
+    ax2.set_xlim(-10, half_circ + 20)
     ax2.set_ylim(-5, graft_length + 15)
-    ax2.set_xlabel('Circumference (mm)')
+    ax2.set_xlabel('Circumference (mm) - Anterior Half')
     ax2.set_ylabel('Distance from Bottom (mm)')
-    ax2.set_title('Printable Template')
+    ax2.set_title('Printable Template (9 → 12 → 3)')
     ax2.grid(True, alpha=0.3)
     
     st.pyplot(fig2)
@@ -280,35 +323,29 @@ with col_ref2:
 
 # Clock position reference
 st.subheader("🕐 Clock Position Reference")
-col_clk1, col_clk2 = st.columns(2)
-with col_clk1:
-    st.markdown("""
-    | Clock | Position |
-    |-------|----------|
-    | 12 | Anterior (front) |
-    | 3 | Left |
-    | 6 | Posterior (back) |
-    | 9 | Right |
-    """)
-with col_clk2:
-    st.markdown("""
-    | Clock | Position |
-    |-------|----------|
-    | 1-2 | Anterior-Left |
-    | 4-5 | Posterior-Left |
-    | 7-8 | Posterior-Right |
-    | 10-11 | Anterior-Right |
-    """)
+st.markdown("""
+| Clock | Template Position |
+|-------|-------------------|
+| 9 | Left edge |
+| 10 | Between 9 and 11 |
+| 11 | Between 10 and 12 |
+| **12** | **Center (Anterior)** |
+| 1 | Between 12 and 2 |
+| 2 | Between 1 and 3 |
+| 3 | Right edge |
+| 4-5 | Beyond right edge |
+| 6 | Posterior (not shown) |
+| 7-8 | Beyond left edge |
+""")
 
 # Print instructions
 st.subheader("📄 Print Instructions")
 st.info("""
 1. Ensure printer is set to "Actual Size" or "100%" scale
-2. Use standard A4/Letter paper
-3. Sterilize printed template before use
-4. Align 12 o'clock mark with anterior position on graft
-5. Wrap template around actual graft (9 o'clock = right side of patient)
-6. Use holes as cutting guides
+2. This template shows the ANTERIOR half (9 to 3 via 12)
+3. Align 12 o'clock mark with anterior midline of graft
+4. 9 o'clock = patient's RIGHT side
+5. 3 o'clock = patient's LEFT side
 """)
 
 # Download template
@@ -316,22 +353,43 @@ if st.session_state.fenestrations:
     fig_download, ax_download = plt.subplots(figsize=(12, 10))
     
     circumference = np.pi * graft_diameter
-    rect = Rectangle((0, 0), circumference, graft_length, 
+    half_circ = circumference / 2
+    
+    rect = Rectangle((0, 0), half_circ, graft_length, 
                     linewidth=2, edgecolor='black', facecolor='white')
     ax_download.add_patch(rect)
     
     # Clock markers
-    ax_download.axvline(x=0, color='blue', linestyle='--', linewidth=1, alpha=0.5)
-    ax_download.text(0, graft_length + 5, "9 o'clock", fontsize=9, ha='center', color='blue')
-    
-    ax_download.axvline(x=circumference/2, color='blue', linestyle='--', linewidth=1, alpha=0.5)
-    ax_download.text(circumference/2, graft_length + 5, "12 o'clock", fontsize=9, ha='center', color='blue')
-    
-    ax_download.axvline(x=circumference, color='blue', linestyle='--', linewidth=1, alpha=0.5)
-    ax_download.text(circumference, graft_length + 5, "3 o'clock", fontsize=9, ha='center', color='blue')
+    clock_labels = [9, 10, 11, 12, 1, 2, 3]
+    for i, clock in enumerate(clock_labels):
+        x = (i / 6) * half_circ
+        ax_download.axvline(x=x, color='blue', linestyle='--', linewidth=1, alpha=0.5)
+        ax_download.text(x, graft_length + 5, f"{clock}", fontsize=9, ha='center', color='blue')
     
     for i, fen in enumerate(st.session_state.fenestrations):
-        x = clock_to_template_position(fen['clock'], circumference)
+        clock = fen['clock']
+        if clock == 9:
+            x_frac = 0
+        elif clock == 10:
+            x_frac = 1/6
+        elif clock == 11:
+            x_frac = 2/6
+        elif clock == 12:
+            x_frac = 3/6
+        elif clock == 1:
+            x_frac = 4/6
+        elif clock == 2:
+            x_frac = 5/6
+        elif clock == 3:
+            x_frac = 6/6
+        elif clock == 4:
+            x_frac = 7/6
+        elif clock == 5:
+            x_frac = 8/6
+        else:
+            x_frac = 3/6
+        
+        x = x_frac * half_circ
         y = graft_length - fen['position']
         circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.7)
         ax_download.add_patch(circle)
@@ -339,11 +397,11 @@ if st.session_state.fenestrations:
         ax_download.text(x + fenestration_size/2 + 2, y, short_name, fontsize=10, fontweight='bold')
     
     ax_download.set_aspect('equal')
-    ax_download.set_xlim(-5, circumference + 15)
+    ax_download.set_xlim(-5, half_circ + 15)
     ax_download.set_ylim(-5, graft_length + 15)
     ax_download.set_xlabel('Circumference (mm)')
     ax_download.set_ylabel('Distance from Bottom (mm)')
-    ax_download.set_title(f'Graft Template - {graft_diameter}mm x {graft_length}mm')
+    ax_download.set_title(f'Graft Template - {graft_diameter}mm x {graft_length}mm (Anterior: 9→12→3)')
     ax_download.grid(True, alpha=0.3)
     
     buf = io.BytesIO()
