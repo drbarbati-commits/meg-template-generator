@@ -12,11 +12,38 @@ st.set_page_config(
     layout="wide"
 )
 
+# Vessel name options
+VESSEL_OPTIONS = [
+    "Celiac Trunk",
+    "SMA",
+    "LRA",
+    "RRA",
+    "IMA",
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "F5"
+]
+
+# Short names for display on template
+VESSEL_SHORT_NAMES = {
+    "Celiac Trunk": "CT",
+    "SMA": "SMA",
+    "LRA": "LRA",
+    "RRA": "RRA",
+    "IMA": "IMA",
+    "F1": "F1",
+    "F2": "F2",
+    "F3": "F3",
+    "F4": "F4",
+    "F5": "F5"
+}
+
 # Function to convert clock position to degrees
 def clock_to_degrees(clock_position):
     # 12 o'clock = 180 degrees
     # Each hour = 30 degrees
-    # Clock goes clockwise, so we subtract from 180
     degrees = 180 - (clock_position - 12) * 30
     if degrees < 0:
         degrees += 360
@@ -24,15 +51,14 @@ def clock_to_degrees(clock_position):
         degrees -= 360
     return degrees
 
-# Function to convert degrees to clock position
-def degrees_to_clock(degrees):
-    # Reverse of clock_to_degrees
-    clock = 12 - (degrees - 180) / 30
-    if clock <= 0:
-        clock += 12
-    if clock > 12:
-        clock -= 12
-    return clock
+# Function to get available vessel options (exclude already used ones)
+def get_available_vessels():
+    used_vessels = [fen['vessel'] for fen in st.session_state.fenestrations]
+    available = []
+    for vessel in VESSEL_OPTIONS:
+        if vessel.startswith("F") or vessel not in used_vessels:
+            available.append(vessel)
+    return available
 
 # Initialize session state
 if 'fenestrations' not in st.session_state:
@@ -100,7 +126,8 @@ with col1:
         
         circle = Circle((x, y), 8, color='red', alpha=0.7)
         ax1.add_patch(circle)
-        ax1.text(x + 12, y, f'F{i+1}', fontsize=10, fontweight='bold')
+        short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
+        ax1.text(x + 12, y, short_name, fontsize=10, fontweight='bold')
     
     ax1.set_title(f"Graft: {graft_diameter}mm x {graft_length}mm")
     ax1.axis('off')
@@ -110,7 +137,17 @@ with col1:
     plt.close(fig1)
     
     # Manual fenestration input
-    st.markdown("**Add Fenestration Manually:**")
+    st.markdown("**Add Fenestration:**")
+    
+    # Vessel selection
+    available_vessels = get_available_vessels()
+    new_vessel = st.selectbox(
+        "Vessel / Fenestration Name",
+        available_vessels,
+        index=0,
+        help="Select the target vessel or use F1, F2, etc. for custom fenestrations"
+    )
+    
     col1a, col1b = st.columns(2)
     with col1a:
         new_position = st.number_input("Position from top (mm)", 0, graft_length, 60)
@@ -125,6 +162,7 @@ with col1:
     if st.button("Add Fenestration"):
         new_degrees = clock_to_degrees(new_clock)
         st.session_state.fenestrations.append({
+            'vessel': new_vessel,
             'position': new_position,
             'clock': new_clock,
             'degrees': new_degrees
@@ -160,7 +198,8 @@ with col2:
         
         circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.7)
         ax2.add_patch(circle)
-        ax2.text(x + fenestration_size/2 + 2, y, f'F{i+1}', fontsize=10, fontweight='bold')
+        short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
+        ax2.text(x + fenestration_size/2 + 2, y, short_name, fontsize=10, fontweight='bold')
     
     ax2.set_xlim(-5, circumference + 5)
     ax2.set_ylim(-5, graft_length + 15)
@@ -178,16 +217,36 @@ if st.session_state.fenestrations:
     for i, fen in enumerate(st.session_state.fenestrations):
         col_a, col_b = st.columns([4, 1])
         with col_a:
-            st.write(f"**F{i+1}:** Position: {fen['position']:.1f}mm from top, Clock: {fen['clock']} o'clock, Size: {fenestration_size}mm")
+            st.write(f"**{fen['vessel']}:** Position: {fen['position']:.1f}mm from top, Clock: {fen['clock']} o'clock, Size: {fenestration_size}mm")
         with col_b:
             if st.button(f"Delete", key=f"del_{i}"):
                 st.session_state.fenestrations.pop(i)
                 st.rerun()
 
-# Clock position reference
-st.subheader("🕐 Clock Position Reference")
+# Vessel reference
+st.subheader("🩺 Vessel Reference")
 col_ref1, col_ref2 = st.columns(2)
 with col_ref1:
+    st.markdown("""
+    | Abbreviation | Full Name |
+    |--------------|-----------|
+    | CT | Celiac Trunk |
+    | SMA | Superior Mesenteric Artery |
+    | LRA | Left Renal Artery |
+    """)
+with col_ref2:
+    st.markdown("""
+    | Abbreviation | Full Name |
+    |--------------|-----------|
+    | RRA | Right Renal Artery |
+    | IMA | Inferior Mesenteric Artery |
+    | F1-F5 | Custom Fenestrations |
+    """)
+
+# Clock position reference
+st.subheader("🕐 Clock Position Reference")
+col_clk1, col_clk2 = st.columns(2)
+with col_clk1:
     st.markdown("""
     | Clock | Position |
     |-------|----------|
@@ -196,7 +255,7 @@ with col_ref1:
     | 6 | Posterior (back) |
     | 9 | Right |
     """)
-with col_ref2:
+with col_clk2:
     st.markdown("""
     | Clock | Position |
     |-------|----------|
@@ -238,7 +297,8 @@ if st.session_state.fenestrations:
         y = fen['position']
         circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.7)
         ax_download.add_patch(circle)
-        ax_download.text(x + fenestration_size/2 + 2, y, f'F{i+1}', fontsize=10, fontweight='bold')
+        short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
+        ax_download.text(x + fenestration_size/2 + 2, y, short_name, fontsize=10, fontweight='bold')
     
     ax_download.set_xlim(-5, circumference + 5)
     ax_download.set_ylim(-5, graft_length + 15)
