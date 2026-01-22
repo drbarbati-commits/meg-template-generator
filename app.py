@@ -201,11 +201,11 @@ with col1:
             
             y = 100 - (fen['position'] / graft_length) * 200
             
-            # 50% transparency for fenestrations behind the graft
-            circle = Circle((x, y), 8, color='red', alpha=0.35, zorder=3)
+            # Use actual fenestration_size from slider
+            circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.35, zorder=3)
             ax1.add_patch(circle)
             short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
-            ax1.text(x + 12, y, short_name, fontsize=10, fontweight='bold', alpha=0.5, zorder=3)
+            ax1.text(x + fenestration_size/2 + 2, y, short_name, fontsize=10, fontweight='bold', alpha=0.5, zorder=3)
     
     # Draw fenestrations IN FRONT of the graft (higher z-order)
     for i, fen in enumerate(st.session_state.fenestrations):
@@ -232,11 +232,11 @@ with col1:
             
             y = 100 - (fen['position'] / graft_length) * 200
             
-            # Full opacity for fenestrations in front
-            circle = Circle((x, y), 8, color='red', alpha=0.7, zorder=5)
+            # Use actual fenestration_size from slider
+            circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.7, zorder=5)
             ax1.add_patch(circle)
             short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
-            ax1.text(x + 12, y, short_name, fontsize=10, fontweight='bold', zorder=5)
+            ax1.text(x + fenestration_size/2 + 2, y, short_name, fontsize=10, fontweight='bold', zorder=5)
     
     ax1.text(0, 150, "TOP (Proximal) - 0mm", fontsize=10, ha='center', color='green', fontweight='bold', zorder=10)
     ax1.text(0, -145, f"BOTTOM (Distal) - {graft_length}mm", fontsize=10, ha='center', color='green', fontweight='bold', zorder=10)
