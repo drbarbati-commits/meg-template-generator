@@ -41,14 +41,9 @@ VESSEL_SHORT_NAMES = {
 }
 
 # Function to convert clock position to X fraction on template
-# Template shows FULL circumference: 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6
-# 6 o'clock at both edges (posterior), 12 o'clock at center (anterior)
 def clock_to_x_fraction(clock_position):
-    # Clock order on template: 6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6
-    # Position:                0  1  2  3   4   5   6  7  8  9 10 11 12 (out of 12)
-    
     if clock_position == 6:
-        return 0.0  # Left edge (or 1.0 for right edge)
+        return 0.0
     elif clock_position == 7:
         return 1/12
     elif clock_position == 8:
@@ -60,7 +55,7 @@ def clock_to_x_fraction(clock_position):
     elif clock_position == 11:
         return 5/12
     elif clock_position == 12:
-        return 6/12  # Center (0.5)
+        return 6/12
     elif clock_position == 1:
         return 7/12
     elif clock_position == 2:
@@ -71,8 +66,7 @@ def clock_to_x_fraction(clock_position):
         return 10/12
     elif clock_position == 5:
         return 11/12
-    
-    return 0.5  # Default to center
+    return 0.5
 
 # Function to get available vessel options
 def get_available_vessels():
@@ -114,36 +108,29 @@ with col1:
     st.subheader("3D Graft View")
     st.markdown("*Add fenestrations using clock positions (12 o'clock = anterior)*")
     
-    # Create 3D-like visualization
     fig1, ax1 = plt.subplots(figsize=(8, 6))
     ax1.set_xlim(-120, 120)
     ax1.set_ylim(-150, 150)
     ax1.set_aspect('equal')
     
-    # Top ellipse (proximal end)
     ellipse_top = patches.Ellipse((0, 100), 160, 60, linewidth=2, 
                                  edgecolor='black', facecolor='lightblue', alpha=0.3)
     ax1.add_patch(ellipse_top)
     
-    # Bottom ellipse (distal end)
     ellipse_bottom = patches.Ellipse((0, -100), 160, 60, linewidth=2, 
                                    edgecolor='black', facecolor='lightblue', alpha=0.3)
     ax1.add_patch(ellipse_bottom)
     
-    # Side lines
     ax1.plot([-80, -80], [-100, 100], 'k-', linewidth=2)
     ax1.plot([80, 80], [-100, 100], 'k-', linewidth=2)
     
-    # Clock position labels
     ax1.text(0, 135, "12", fontsize=9, ha='center', va='center', color='blue')
     ax1.text(0, 65, "6", fontsize=9, ha='center', va='center', color='blue')
     ax1.text(-95, 100, "9", fontsize=9, ha='center', va='center', color='blue')
     ax1.text(95, 100, "3", fontsize=9, ha='center', va='center', color='blue')
     
-    # Draw fenestrations on 3D view
     for i, fen in enumerate(st.session_state.fenestrations):
         clock = fen['clock']
-        # Map clock to x position: 9=-80, 12=0, 3=80
         if clock == 12:
             x = 0
         elif clock == 9:
@@ -179,7 +166,6 @@ with col1:
     st.pyplot(fig1)
     plt.close(fig1)
     
-    # Fenestration input
     st.markdown("**Add Fenestration:**")
     
     available_vessels = get_available_vessels()
@@ -213,37 +199,33 @@ with col2:
     st.subheader("2D Template (Unwrapped)")
     st.markdown("*Full circumference: 6 (posterior) → 12 (anterior) → 6 (posterior)*")
     
-    # Calculate dimensions
     circumference = np.pi * graft_diameter
     
-    # Create 2D template
     fig2, ax2 = plt.subplots(figsize=(12, 8))
     
-    # Draw template rectangle (full circumference)
+    # Draw template rectangle
     rect = Rectangle((0, 0), circumference, graft_length, 
                     linewidth=2, edgecolor='black', facecolor='lightgray', alpha=0.3)
     ax2.add_patch(rect)
     
-    # Clock position markers - ALL 12 positions plus 6 at both ends
-    # Order: 6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6
+    # Clock position markers
     clock_order = [6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6]
     
     for i, clock in enumerate(clock_order):
         x = (i / 12) * circumference
         
-        # Major lines for 12, 3, 6, 9
         if clock in [12, 3, 6, 9]:
             ax2.axvline(x=x, color='blue', linestyle='--', linewidth=1.5, alpha=0.7)
-            ax2.text(x, graft_length + 5, str(clock), fontsize=11, ha='center', color='blue', fontweight='bold')
+            ax2.text(x, -5, str(clock), fontsize=11, ha='center', color='blue', fontweight='bold')
         else:
             ax2.axvline(x=x, color='lightblue', linestyle=':', linewidth=1, alpha=0.5)
-            ax2.text(x, graft_length + 5, str(clock), fontsize=9, ha='center', color='gray')
+            ax2.text(x, -5, str(clock), fontsize=9, ha='center', color='gray')
     
-    # Draw fenestrations
+    # Draw fenestrations - Y is now directly the position from top
     for i, fen in enumerate(st.session_state.fenestrations):
         x_frac = clock_to_x_fraction(fen['clock'])
         x = x_frac * circumference
-        y = graft_length - fen['position']
+        y = fen['position']  # Direct position from top
         
         circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.7)
         ax2.add_patch(circle)
@@ -252,9 +234,9 @@ with col2:
     
     ax2.set_aspect('equal')
     ax2.set_xlim(-5, circumference + 10)
-    ax2.set_ylim(-5, graft_length + 15)
+    ax2.set_ylim(graft_length + 10, -15)  # INVERTED: 0 at top, graft_length at bottom
     ax2.set_xlabel('Circumference (mm)')
-    ax2.set_ylabel('Distance from Bottom (mm)')
+    ax2.set_ylabel('Distance from Top (mm)')
     ax2.set_title('Printable Template - Full Circumference')
     ax2.grid(True, alpha=0.3)
     
@@ -309,10 +291,9 @@ st.subheader("📄 Print Instructions")
 st.info("""
 1. Ensure printer is set to "Actual Size" or "100%" scale
 2. Template shows FULL circumference (can be wrapped around graft)
-3. 12 o'clock (center) = Anterior (front of patient)
-4. 6 o'clock (edges) = Posterior (back of patient)
-5. 9 o'clock = Patient's RIGHT side
-6. 3 o'clock = Patient's LEFT side
+3. Y-axis: 0 = TOP of graft (proximal), increasing downward
+4. 12 o'clock (center) = Anterior (front of patient)
+5. 6 o'clock (edges) = Posterior (back of patient)
 """)
 
 # Download template
@@ -325,21 +306,20 @@ if st.session_state.fenestrations:
                     linewidth=2, edgecolor='black', facecolor='white')
     ax_download.add_patch(rect)
     
-    # All clock markers
     clock_order = [6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6]
     for i, clock in enumerate(clock_order):
         x = (i / 12) * circumference
         if clock in [12, 3, 6, 9]:
             ax_download.axvline(x=x, color='blue', linestyle='--', linewidth=1.5, alpha=0.7)
-            ax_download.text(x, graft_length + 5, f"{clock}", fontsize=10, ha='center', color='blue', fontweight='bold')
+            ax_download.text(x, -5, f"{clock}", fontsize=10, ha='center', color='blue', fontweight='bold')
         else:
             ax_download.axvline(x=x, color='lightblue', linestyle=':', linewidth=1, alpha=0.5)
-            ax_download.text(x, graft_length + 5, f"{clock}", fontsize=9, ha='center', color='gray')
+            ax_download.text(x, -5, f"{clock}", fontsize=9, ha='center', color='gray')
     
     for i, fen in enumerate(st.session_state.fenestrations):
         x_frac = clock_to_x_fraction(fen['clock'])
         x = x_frac * circumference
-        y = graft_length - fen['position']
+        y = fen['position']
         circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.7)
         ax_download.add_patch(circle)
         short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
@@ -347,9 +327,9 @@ if st.session_state.fenestrations:
     
     ax_download.set_aspect('equal')
     ax_download.set_xlim(-5, circumference + 10)
-    ax_download.set_ylim(-5, graft_length + 15)
+    ax_download.set_ylim(graft_length + 10, -15)  # INVERTED Y-axis
     ax_download.set_xlabel('Circumference (mm)')
-    ax_download.set_ylabel('Distance from Bottom (mm)')
+    ax_download.set_ylabel('Distance from Top (mm)')
     ax_download.set_title(f'Graft Template - {graft_diameter}mm x {graft_length}mm')
     ax_download.grid(True, alpha=0.3)
     
