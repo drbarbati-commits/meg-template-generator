@@ -132,49 +132,49 @@ with col1:
     ax1.set_xlim(-150, 160)
     ax1.set_ylim(-160, 160)
     
-    # Draw cylinder body (sides)
-    ax1.plot([-80, -80], [-100, 100], 'k-', linewidth=2)
-    ax1.plot([80, 80], [-100, 100], 'k-', linewidth=2)
-    
-    # Draw bottom ellipse (fully visible, same color as shaft)
-    ellipse_bottom = patches.Ellipse((0, -100), 160, 60, linewidth=2, 
-                                   edgecolor='black', facecolor='lightblue', alpha=0.3)
-    ax1.add_patch(ellipse_bottom)
-    
-    # Draw top ellipse - FRONT HALF (solid line, same color as shaft)
-    # Front arc: from -90 to 90 degrees (right to left, top half)
-    arc_front = Arc((0, 100), 160, 60, angle=0, theta1=-90, theta2=90, 
-                    linewidth=2, edgecolor='black', fill=False)
-    ax1.add_patch(arc_front)
-    
-    # Fill the top ellipse with same color as shaft
+    # Draw top ellipse - FILLED completely with graft color (not visible from front)
     ellipse_top_fill = patches.Ellipse((0, 100), 160, 60, linewidth=0, 
                                        facecolor='lightblue', alpha=0.3, zorder=1)
     ax1.add_patch(ellipse_top_fill)
     
-    # Draw top ellipse - BACK HALF (dotted line to show it's behind)
-    # Back arc: from 90 to 270 degrees (left to right, bottom half)
-    theta = np.linspace(np.pi/2, 3*np.pi/2, 100)
-    x_back = 80 * np.cos(theta)
-    y_back = 100 + 30 * np.sin(theta)
-    ax1.plot(x_back, y_back, 'k:', linewidth=2, alpha=0.6)
+    # Draw top ellipse - TOP HALF (solid line - visible part)
+    # Top arc: from 180 to 0 degrees (left to right, upper half)
+    arc_top = Arc((0, 100), 160, 60, angle=0, theta1=0, theta2=180, 
+                  linewidth=2, edgecolor='black', fill=False, zorder=2)
+    ax1.add_patch(arc_top)
+    
+    # Draw top ellipse - BOTTOM HALF (dotted line - part curving away)
+    # Bottom arc: from 0 to -180 degrees (right to left, lower half)
+    theta = np.linspace(0, -np.pi, 100)
+    x_bottom = 80 * np.cos(theta)
+    y_bottom = 100 + 30 * np.sin(theta)
+    ax1.plot(x_bottom, y_bottom, 'k:', linewidth=2, alpha=0.6, zorder=2)
+    
+    # Draw cylinder body (sides)
+    ax1.plot([-80, -80], [-100, 100], 'k-', linewidth=2, zorder=2)
+    ax1.plot([80, 80], [-100, 100], 'k-', linewidth=2, zorder=2)
+    
+    # Draw bottom ellipse (fully visible, same color as shaft)
+    ellipse_bottom = patches.Ellipse((0, -100), 160, 60, linewidth=2, 
+                                   edgecolor='black', facecolor='lightblue', alpha=0.3, zorder=2)
+    ax1.add_patch(ellipse_bottom)
     
     # Clock position labels
-    ax1.text(0, 135, "12", fontsize=9, ha='center', va='center', color='blue')
-    ax1.text(0, 65, "6", fontsize=9, ha='center', va='center', color='blue')
-    ax1.text(-95, 100, "9", fontsize=9, ha='center', va='center', color='blue')
-    ax1.text(95, 100, "3", fontsize=9, ha='center', va='center', color='blue')
+    ax1.text(0, 135, "12", fontsize=9, ha='center', va='center', color='blue', zorder=10)
+    ax1.text(0, 65, "6", fontsize=9, ha='center', va='center', color='blue', zorder=10)
+    ax1.text(-95, 100, "9", fontsize=9, ha='center', va='center', color='blue', zorder=10)
+    ax1.text(95, 100, "3", fontsize=9, ha='center', va='center', color='blue', zorder=10)
     
     # Y-axis labels (distance from top) - dotted lines extend to numbers
     y_ticks = [0, graft_length//4, graft_length//2, 3*graft_length//4, graft_length]
     for tick in y_ticks:
         y_pos = 100 - (tick / graft_length) * 200
         # Draw gray dotted line from left edge through graft to the number
-        ax1.plot([-80, 120], [y_pos, y_pos], color='gray', linestyle=':', linewidth=1, alpha=0.6)
+        ax1.plot([-80, 120], [y_pos, y_pos], color='gray', linestyle=':', linewidth=1, alpha=0.6, zorder=0)
         # Text label
-        ax1.text(125, y_pos, f"{tick}", fontsize=9, ha='left', va='center', color='darkgreen')
+        ax1.text(125, y_pos, f"{tick}", fontsize=9, ha='left', va='center', color='darkgreen', zorder=10)
     
-    ax1.text(140, 0, "mm", fontsize=9, ha='left', va='center', color='darkgreen', rotation=90)
+    ax1.text(140, 0, "mm", fontsize=9, ha='left', va='center', color='darkgreen', rotation=90, zorder=10)
     
     # Draw fenestrations BEHIND the graft first (lower z-order)
     for i, fen in enumerate(st.session_state.fenestrations):
@@ -202,10 +202,10 @@ with col1:
             y = 100 - (fen['position'] / graft_length) * 200
             
             # 50% transparency for fenestrations behind the graft
-            circle = Circle((x, y), 8, color='red', alpha=0.35, zorder=2)
+            circle = Circle((x, y), 8, color='red', alpha=0.35, zorder=3)
             ax1.add_patch(circle)
             short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
-            ax1.text(x + 12, y, short_name, fontsize=10, fontweight='bold', alpha=0.5)
+            ax1.text(x + 12, y, short_name, fontsize=10, fontweight='bold', alpha=0.5, zorder=3)
     
     # Draw fenestrations IN FRONT of the graft (higher z-order)
     for i, fen in enumerate(st.session_state.fenestrations):
@@ -233,13 +233,13 @@ with col1:
             y = 100 - (fen['position'] / graft_length) * 200
             
             # Full opacity for fenestrations in front
-            circle = Circle((x, y), 8, color='red', alpha=0.7, zorder=3)
+            circle = Circle((x, y), 8, color='red', alpha=0.7, zorder=5)
             ax1.add_patch(circle)
             short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
-            ax1.text(x + 12, y, short_name, fontsize=10, fontweight='bold')
+            ax1.text(x + 12, y, short_name, fontsize=10, fontweight='bold', zorder=5)
     
-    ax1.text(0, 150, "TOP (Proximal) - 0mm", fontsize=10, ha='center', color='green', fontweight='bold')
-    ax1.text(0, -145, f"BOTTOM (Distal) - {graft_length}mm", fontsize=10, ha='center', color='green', fontweight='bold')
+    ax1.text(0, 150, "TOP (Proximal) - 0mm", fontsize=10, ha='center', color='green', fontweight='bold', zorder=10)
+    ax1.text(0, -145, f"BOTTOM (Distal) - {graft_length}mm", fontsize=10, ha='center', color='green', fontweight='bold', zorder=10)
     
     ax1.set_title(f"Graft: {graft_diameter}mm x {graft_length}mm")
     ax1.set_aspect('equal')
