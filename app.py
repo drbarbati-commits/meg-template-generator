@@ -3,6 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.patches import Circle, Rectangle
+import matplotlib.image as mpimg
+from urllib.request import urlopen
+from PIL import Image
 import io
 
 # Page configuration
@@ -11,6 +14,9 @@ st.set_page_config(
     page_icon="🏥",
     layout="wide"
 )
+
+# Logo URL (your uploaded logo)
+LOGO_URL = "https://d41chssnpqdne.cloudfront.net/user_upload_by_module/chat_bot/files/71012469/WiLA8Zq288whTgZe.png?Expires=1770316868&Signature=Q9PcSf7pGrEmSU1x13IPSopBRmuByk-Lit3Gj4J9vQXse5~IM24GPe5nukMgrEOHIUBFJEENACvGq60NsOq1tCWXKEZ2UUx0zav-AACaYUwWJMkfan7LMxKKcMpJz6dY6KcUwKFB-SH5CB1JiCxqzrv7exSPRq6Og~NSqe6fMBCjrEp8xJ~fYf-~hC2bi4fGIKFhswEylyOUGb63uhYaTTpyo2AakM5d~RfYoJFCOgjN9GH6axVrNl5R49NXHjPnURcSPNi6jBwSNk5sCr7V9D4LgHIdYXbE9lPOlHKJi94QmJH7HoKR4jEQYkGZ2mvCSsgtJtVl1vcCHmQB6vVxMw__&Key-Pair-Id=K3USGZIKWMDCSX"
 
 # Vessel name options
 VESSEL_OPTIONS = [
@@ -68,6 +74,16 @@ def clock_to_x_fraction(clock_position):
         return 11/12
     return 0.5
 
+# Function to load logo
+@st.cache_data
+def load_logo():
+    try:
+        with urlopen(LOGO_URL) as response:
+            img = Image.open(response)
+            return np.array(img)
+    except:
+        return None
+
 # Function to get available vessel options
 def get_available_vessels():
     used_vessels = [fen['vessel'] for fen in st.session_state.fenestrations]
@@ -80,6 +96,9 @@ def get_available_vessels():
 # Initialize session state
 if 'fenestrations' not in st.session_state:
     st.session_state.fenestrations = []
+
+# Load logo
+logo_img = load_logo()
 
 # Title and description
 st.title("🏥 PMEG Template Generator")
@@ -108,11 +127,11 @@ with col1:
     st.subheader("3D Graft View")
     st.markdown("*Add fenestrations using clock positions (12 o'clock = anterior)*")
     
-    fig1, ax1 = plt.subplots(figsize=(8, 6))
-    ax1.set_xlim(-120, 120)
-    ax1.set_ylim(-150, 150)
-    ax1.set_aspect('equal')
+    fig1, ax1 = plt.subplots(figsize=(8, 7))
+    ax1.set_xlim(-140, 140)
+    ax1.set_ylim(-160, 160)
     
+    # Draw cylinder
     ellipse_top = patches.Ellipse((0, 100), 160, 60, linewidth=2, 
                                  edgecolor='black', facecolor='lightblue', alpha=0.3)
     ax1.add_patch(ellipse_top)
@@ -124,11 +143,23 @@ with col1:
     ax1.plot([-80, -80], [-100, 100], 'k-', linewidth=2)
     ax1.plot([80, 80], [-100, 100], 'k-', linewidth=2)
     
+    # Clock position labels
     ax1.text(0, 135, "12", fontsize=9, ha='center', va='center', color='blue')
     ax1.text(0, 65, "6", fontsize=9, ha='center', va='center', color='blue')
     ax1.text(-95, 100, "9", fontsize=9, ha='center', va='center', color='blue')
     ax1.text(95, 100, "3", fontsize=9, ha='center', va='center', color='blue')
     
+    # Y-axis labels (distance from top) - on the right side of the cylinder
+    # 0mm at top (y=100), graft_length at bottom (y=-100)
+    y_ticks = [0, graft_length//4, graft_length//2, 3*graft_length//4, graft_length]
+    for tick in y_ticks:
+        y_pos = 100 - (tick / graft_length) * 200
+        ax1.text(100, y_pos, f"{tick}", fontsize=8, ha='left', va='center', color='darkgreen')
+        ax1.plot([82, 88], [y_pos, y_pos], 'g-', linewidth=1, alpha=0.5)
+    
+    ax1.text(115, 0, "mm", fontsize=8, ha='left', va='center', color='darkgreen', rotation=90)
+    
+    # Draw fenestrations
     for i, fen in enumerate(st.session_state.fenestrations):
         clock = fen['clock']
         if clock == 12:
@@ -157,11 +188,18 @@ with col1:
         short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
         ax1.text(x + 12, y, short_name, fontsize=10, fontweight='bold')
     
-    ax1.text(0, 145, "TOP (Proximal)", fontsize=10, ha='center', color='green', fontweight='bold')
-    ax1.text(0, -140, "BOTTOM (Distal)", fontsize=10, ha='center', color='green', fontweight='bold')
+    ax1.text(0, 150, "TOP (Proximal) - 0mm", fontsize=10, ha='center', color='green', fontweight='bold')
+    ax1.text(0, -145, f"BOTTOM (Distal) - {graft_length}mm", fontsize=10, ha='center', color='green', fontweight='bold')
     
     ax1.set_title(f"Graft: {graft_diameter}mm x {graft_length}mm")
+    ax1.set_aspect('equal')
     ax1.axis('off')
+    
+    # Add logo to bottom right
+    if logo_img is not None:
+        ax_logo1 = fig1.add_axes([0.75, 0.02, 0.15, 0.15])
+        ax_logo1.imshow(logo_img)
+        ax_logo1.axis('off')
     
     st.pyplot(fig1)
     plt.close(fig1)
@@ -203,12 +241,10 @@ with col2:
     
     fig2, ax2 = plt.subplots(figsize=(12, 8))
     
-    # Draw template rectangle
     rect = Rectangle((0, 0), circumference, graft_length, 
                     linewidth=2, edgecolor='black', facecolor='lightgray', alpha=0.3)
     ax2.add_patch(rect)
     
-    # Clock position markers
     clock_order = [6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6]
     
     for i, clock in enumerate(clock_order):
@@ -221,11 +257,10 @@ with col2:
             ax2.axvline(x=x, color='lightblue', linestyle=':', linewidth=1, alpha=0.5)
             ax2.text(x, -5, str(clock), fontsize=9, ha='center', color='gray')
     
-    # Draw fenestrations - Y is now directly the position from top
     for i, fen in enumerate(st.session_state.fenestrations):
         x_frac = clock_to_x_fraction(fen['clock'])
         x = x_frac * circumference
-        y = fen['position']  # Direct position from top
+        y = fen['position']
         
         circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.7)
         ax2.add_patch(circle)
@@ -234,11 +269,17 @@ with col2:
     
     ax2.set_aspect('equal')
     ax2.set_xlim(-5, circumference + 10)
-    ax2.set_ylim(graft_length + 10, -15)  # INVERTED: 0 at top, graft_length at bottom
+    ax2.set_ylim(graft_length + 10, -15)
     ax2.set_xlabel('Circumference (mm)')
     ax2.set_ylabel('Distance from Top (mm)')
     ax2.set_title('Printable Template - Full Circumference')
     ax2.grid(True, alpha=0.3)
+    
+    # Add logo to bottom right
+    if logo_img is not None:
+        ax_logo2 = fig2.add_axes([0.82, 0.02, 0.12, 0.12])
+        ax_logo2.imshow(logo_img)
+        ax_logo2.axis('off')
     
     st.pyplot(fig2)
     plt.close(fig2)
@@ -327,11 +368,17 @@ if st.session_state.fenestrations:
     
     ax_download.set_aspect('equal')
     ax_download.set_xlim(-5, circumference + 10)
-    ax_download.set_ylim(graft_length + 10, -15)  # INVERTED Y-axis
+    ax_download.set_ylim(graft_length + 10, -15)
     ax_download.set_xlabel('Circumference (mm)')
     ax_download.set_ylabel('Distance from Top (mm)')
     ax_download.set_title(f'Graft Template - {graft_diameter}mm x {graft_length}mm')
     ax_download.grid(True, alpha=0.3)
+    
+    # Add logo to downloaded PDF
+    if logo_img is not None:
+        ax_logo_dl = fig_download.add_axes([0.85, 0.02, 0.10, 0.10])
+        ax_logo_dl.imshow(logo_img)
+        ax_logo_dl.axis('off')
     
     buf = io.BytesIO()
     fig_download.savefig(buf, format='pdf', bbox_inches='tight', dpi=300)
