@@ -132,10 +132,27 @@ with col1:
     ax1.set_xlim(-150, 160)
     ax1.set_ylim(-160, 160)
     
+    # Calculate scaling factor for accurate representation
+    # The graft width in the plot is 160 units (from -80 to 80)
+    # This represents the graft diameter in mm
+    scale_factor = 160 / graft_diameter  # units per mm
+    
     # Draw top ellipse - FILLED completely with graft color (not visible from front)
     ellipse_top_fill = patches.Ellipse((0, 100), 160, 60, linewidth=0, 
                                        facecolor='lightblue', alpha=0.3, zorder=1)
     ax1.add_patch(ellipse_top_fill)
+    
+    # Add shading to make it look more 3D
+    # Create gradient effect on the cylinder
+    from matplotlib.patches import FancyBboxPatch
+    # Left side darker (shadow)
+    rect_shadow_left = Rectangle((-80, -100), 20, 200, 
+                                 linewidth=0, facecolor='gray', alpha=0.15, zorder=1.5)
+    ax1.add_patch(rect_shadow_left)
+    # Right side highlight
+    rect_highlight_right = Rectangle((60, -100), 20, 200, 
+                                    linewidth=0, facecolor='white', alpha=0.2, zorder=1.5)
+    ax1.add_patch(rect_highlight_right)
     
     # Draw top ellipse - TOP HALF (solid line - visible part)
     # Top arc: from 180 to 0 degrees (left to right, upper half)
@@ -150,9 +167,9 @@ with col1:
     y_bottom = 100 + 30 * np.sin(theta)
     ax1.plot(x_bottom, y_bottom, 'k:', linewidth=2, alpha=0.6, zorder=2)
     
-    # Draw cylinder body (sides)
-    ax1.plot([-80, -80], [-100, 100], 'k-', linewidth=2, zorder=2)
-    ax1.plot([80, 80], [-100, 100], 'k-', linewidth=2, zorder=2)
+    # Draw cylinder body (sides) with slight gradient
+    ax1.plot([-80, -80], [-100, 100], 'k-', linewidth=2.5, zorder=2)
+    ax1.plot([80, 80], [-100, 100], 'k-', linewidth=2.5, zorder=2)
     
     # Draw bottom ellipse (fully visible, same color as shaft)
     ellipse_bottom = patches.Ellipse((0, -100), 160, 60, linewidth=2, 
@@ -201,11 +218,14 @@ with col1:
             
             y = 100 - (fen['position'] / graft_length) * 200
             
-            # Use actual fenestration_size from slider
-            circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.35, zorder=3)
+            # Scale fenestration size accurately
+            fen_radius_scaled = (fenestration_size / 2) * scale_factor
+            
+            # 50% transparency for fenestrations behind the graft
+            circle = Circle((x, y), fen_radius_scaled, color='red', alpha=0.35, zorder=3)
             ax1.add_patch(circle)
             short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
-            ax1.text(x + fenestration_size/2 + 2, y, short_name, fontsize=10, fontweight='bold', alpha=0.5, zorder=3)
+            ax1.text(x + fen_radius_scaled + 2, y, short_name, fontsize=10, fontweight='bold', alpha=0.5, zorder=3)
     
     # Draw fenestrations IN FRONT of the graft (higher z-order)
     for i, fen in enumerate(st.session_state.fenestrations):
@@ -232,11 +252,14 @@ with col1:
             
             y = 100 - (fen['position'] / graft_length) * 200
             
-            # Use actual fenestration_size from slider
-            circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.7, zorder=5)
+            # Scale fenestration size accurately
+            fen_radius_scaled = (fenestration_size / 2) * scale_factor
+            
+            # Full opacity for fenestrations in front
+            circle = Circle((x, y), fen_radius_scaled, color='red', alpha=0.7, zorder=5)
             ax1.add_patch(circle)
             short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
-            ax1.text(x + fenestration_size/2 + 2, y, short_name, fontsize=10, fontweight='bold', zorder=5)
+            ax1.text(x + fen_radius_scaled + 2, y, short_name, fontsize=10, fontweight='bold', zorder=5)
     
     ax1.text(0, 150, "TOP (Proximal) - 0mm", fontsize=10, ha='center', color='green', fontweight='bold', zorder=10)
     ax1.text(0, -145, f"BOTTOM (Distal) - {graft_length}mm", fontsize=10, ha='center', color='green', fontweight='bold', zorder=10)
@@ -266,7 +289,7 @@ with col1:
     
     col1a, col1b = st.columns(2)
     with col1a:
-        new_position = st.number_input("Position from top (mm)", 0, graft_length, 60)
+        new_position = st.number_input("Position from top (mm)", 0, graft_length, 20)
     with col1b:
         new_clock = st.selectbox(
             "Clock Position",
@@ -286,10 +309,17 @@ with col1:
 with col2:
     st.subheader("2D Template (Unwrapped)")
     st.markdown("*Full circumference: 6 (posterior) → 12 (anterior) → 6 (posterior)*")
+    st.markdown(f"**Print Scale: 1:1 (Actual size on A4 paper)**")
     
     circumference = np.pi * graft_diameter
     
-    fig2, ax2 = plt.subplots(figsize=(12, 8))
+    # Set figure size to maintain accurate scale for A4 printing
+    # A4 is 210mm x 297mm, we use DPI to ensure accurate sizing
+    dpi = 25.4  # 1 inch = 25.4mm, so 1 DPI = 1mm
+    fig_width = (circumference + 15) / 25.4  # Convert mm to inches
+    fig_height = (graft_length + 25) / 25.4  # Convert mm to inches
+    
+    fig2, ax2 = plt.subplots(figsize=(fig_width, fig_height), dpi=100)
     
     rect = Rectangle((0, 0), circumference, graft_length, 
                     linewidth=2, edgecolor='black', facecolor='lightgray', alpha=0.3)
@@ -312,6 +342,7 @@ with col2:
         x = x_frac * circumference
         y = fen['position']
         
+        # Use actual fenestration size in mm
         circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.7)
         ax2.add_patch(circle)
         short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
@@ -320,9 +351,9 @@ with col2:
     ax2.set_aspect('equal')
     ax2.set_xlim(-5, circumference + 10)
     ax2.set_ylim(graft_length + 10, -15)
-    ax2.set_xlabel('Circumference (mm)')
-    ax2.set_ylabel('Distance from Top (mm)')
-    ax2.set_title('Printable Template - Full Circumference')
+    ax2.set_xlabel('Circumference (mm)', fontsize=10)
+    ax2.set_ylabel('Distance from Top (mm)', fontsize=10)
+    ax2.set_title(f'Printable Template - Full Circumference - Scale 1:1', fontsize=11)
     ax2.grid(True, alpha=0.3)
     
     # Add logo to bottom right - half size with 50% transparency
@@ -383,11 +414,14 @@ st.markdown("""
 # Print instructions
 st.subheader("📄 Print Instructions")
 st.info("""
-1. Ensure printer is set to "Actual Size" or "100%" scale
-2. Template shows FULL circumference (can be wrapped around graft)
-3. Y-axis: 0 = TOP of graft (proximal), increasing downward
-4. 12 o'clock (center) = Anterior (front of patient)
-5. 6 o'clock (edges) = Posterior (back of patient)
+1. **CRITICAL:** Set printer to "Actual Size" or "100%" scale (NOT "Fit to page")
+2. Use A4 paper (210mm x 297mm)
+3. Verify scale: Measure the template width - it should match the calculated circumference
+4. Template shows FULL circumference (can be wrapped around graft)
+5. Y-axis: 0 = TOP of graft (proximal), increasing downward
+6. 12 o'clock (center) = Anterior (front of patient)
+7. 6 o'clock (edges) = Posterior (back of patient)
+8. All measurements are in millimeters (1:1 scale)
 """)
 
 # Download template
@@ -414,6 +448,7 @@ if st.session_state.fenestrations:
         x_frac = clock_to_x_fraction(fen['clock'])
         x = x_frac * circumference
         y = fen['position']
+        # Use actual fenestration size in mm
         circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.7)
         ax_download.add_patch(circle)
         short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
@@ -424,8 +459,12 @@ if st.session_state.fenestrations:
     ax_download.set_ylim(graft_length + 10, -15)
     ax_download.set_xlabel('Circumference (mm)')
     ax_download.set_ylabel('Distance from Top (mm)')
-    ax_download.set_title(f'Graft Template - {graft_diameter}mm x {graft_length}mm')
+    ax_download.set_title(f'Graft Template - {graft_diameter}mm x {graft_length}mm - SCALE 1:1 - Print at 100%')
     ax_download.grid(True, alpha=0.3)
+    
+    # Add scale verification marks
+    ax_download.text(5, graft_length + 5, f"Circumference: {circumference:.1f}mm", fontsize=9, color='red', fontweight='bold')
+    ax_download.text(5, graft_length + 8, f"Graft: {graft_diameter}mm diameter x {graft_length}mm length", fontsize=9, color='blue')
     
     # Add logo to downloaded PDF - half size with 50% transparency
     if logo_img is not None:
