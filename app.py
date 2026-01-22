@@ -93,21 +93,21 @@ with col1:
     
     # Create 3D-like visualization
     fig1, ax1 = plt.subplots(figsize=(8, 6))
-    ax1.set_xlim(-100, 100)
+    ax1.set_xlim(-120, 120)
     ax1.set_ylim(-150, 150)
     ax1.set_aspect('equal')
     
     # Draw cylinder (simplified 3D view)
-    # TOP of graft at y = -100 (top of image)
-    # BOTTOM of graft at y = 100 (bottom of image)
+    # TOP of graft at y = 100 (top of image)
+    # BOTTOM of graft at y = -100 (bottom of image)
     
-    # Top ellipse (proximal end)
-    ellipse_top = patches.Ellipse((0, -100), 160, 60, linewidth=2, 
+    # Top ellipse (proximal end) - at TOP of image
+    ellipse_top = patches.Ellipse((0, 100), 160, 60, linewidth=2, 
                                  edgecolor='black', facecolor='lightblue', alpha=0.3)
     ax1.add_patch(ellipse_top)
     
-    # Bottom ellipse (distal end)
-    ellipse_bottom = patches.Ellipse((0, 100), 160, 60, linewidth=2, 
+    # Bottom ellipse (distal end) - at BOTTOM of image
+    ellipse_bottom = patches.Ellipse((0, -100), 160, 60, linewidth=2, 
                                    edgecolor='black', facecolor='lightblue', alpha=0.3)
     ax1.add_patch(ellipse_bottom)
     
@@ -115,22 +115,20 @@ with col1:
     ax1.plot([-80, -80], [-100, 100], 'k-', linewidth=2)
     ax1.plot([80, 80], [-100, 100], 'k-', linewidth=2)
     
-    # Add clock position labels on bottom ellipse
-    clock_labels = [12, 3, 6, 9]
-    clock_x = [0, 80, 0, -80]
-    clock_y = [130, 100, 70, 100]
-    for label, x, y in zip(clock_labels, clock_x, clock_y):
-        ax1.text(x, y, f"{label}", fontsize=9, ha='center', va='center', color='blue')
+    # Add clock position labels on top ellipse
+    # 12 at top center, 6 at bottom center, 3 and 9 on sides (outside the cylinder)
+    ax1.text(0, 135, "12", fontsize=9, ha='center', va='center', color='blue')
+    ax1.text(0, 65, "6", fontsize=9, ha='center', va='center', color='blue')
+    ax1.text(-95, 100, "9", fontsize=9, ha='center', va='center', color='blue')
+    ax1.text(95, 100, "3", fontsize=9, ha='center', va='center', color='blue')
     
     # Draw fenestrations
-    # Position 0mm = top of graft (y = -100)
-    # Position graft_length = bottom of graft (y = 100)
+    # Position 0mm from top = y = 100 (top)
+    # Position graft_length from top = y = -100 (bottom)
     for i, fen in enumerate(st.session_state.fenestrations):
         x = (fen['degrees'] / 360) * 160 - 80
-        # FIXED: position from top maps correctly
-        # position 0 -> y = -100 (top)
-        # position graft_length -> y = 100 (bottom)
-        y = -100 + (fen['position'] / graft_length) * 200
+        # position from top: 0 -> y=100, graft_length -> y=-100
+        y = 100 - (fen['position'] / graft_length) * 200
         
         circle = Circle((x, y), 8, color='red', alpha=0.7)
         ax1.add_patch(circle)
@@ -138,8 +136,8 @@ with col1:
         ax1.text(x + 12, y, short_name, fontsize=10, fontweight='bold')
     
     # Add labels for top and bottom
-    ax1.text(0, -140, "TOP (Proximal)", fontsize=10, ha='center', color='green')
-    ax1.text(0, 140, "BOTTOM (Distal)", fontsize=10, ha='center', color='green')
+    ax1.text(0, 145, "TOP (Proximal)", fontsize=10, ha='center', color='green', fontweight='bold')
+    ax1.text(0, -140, "BOTTOM (Distal)", fontsize=10, ha='center', color='green', fontweight='bold')
     
     ax1.set_title(f"Graft: {graft_diameter}mm x {graft_length}mm")
     ax1.axis('off')
@@ -204,11 +202,10 @@ with col2:
         ax2.text(x, graft_length + 3, f"{clock_pos}", fontsize=9, ha='center', color='blue')
     
     # Draw fenestrations
-    # For 2D template: Y=0 is TOP of graft, Y=graft_length is BOTTOM
-    # So we need to INVERT: y = graft_length - position
+    # Y=0 is BOTTOM of graft (distal), Y=graft_length is TOP of graft (proximal)
     for i, fen in enumerate(st.session_state.fenestrations):
         x = (fen['degrees'] / 360) * circumference
-        # FIXED: Invert Y so top of graft is at top of template
+        # position from top: 0 -> y=graft_length, graft_length -> y=0
         y = graft_length - fen['position']
         
         circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.7)
@@ -219,7 +216,7 @@ with col2:
     ax2.set_xlim(-5, circumference + 5)
     ax2.set_ylim(-5, graft_length + 15)
     ax2.set_xlabel('Circumference (mm)')
-    ax2.set_ylabel('Distance from BOTTOM (mm)')
+    ax2.set_ylabel('Distance from Bottom (mm)')
     ax2.set_title('Printable Template (Top of graft = Top of template)')
     ax2.grid(True, alpha=0.3)
     
