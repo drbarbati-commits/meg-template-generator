@@ -42,13 +42,22 @@ VESSEL_SHORT_NAMES = {
 
 # Function to convert clock position to degrees
 def clock_to_degrees(clock_position):
-    # 12 o'clock = 180 degrees
-    # Each hour = 30 degrees
-    degrees = 180 - (clock_position - 12) * 30
-    if degrees < 0:
-        degrees += 360
-    if degrees >= 360:
-        degrees -= 360
+    # 12 o'clock = 180 degrees (center/anterior)
+    # 3 o'clock = 90 degrees (left side)
+    # 6 o'clock = 0 degrees (posterior)
+    # 9 o'clock = 270 degrees (right side)
+    # Clock goes clockwise: 12 -> 1 -> 2 -> 3 -> ... -> 11 -> 12
+    # Degrees go: 180 -> 150 -> 120 -> 90 -> 60 -> 30 -> 0 -> 330 -> 300 -> 270 -> 240 -> 210 -> 180
+    
+    if clock_position == 12:
+        degrees = 180
+    elif clock_position <= 6:
+        # 1-6 o'clock: 150, 120, 90, 60, 30, 0
+        degrees = 180 - (clock_position * 30)
+    else:
+        # 7-11 o'clock: 330, 300, 270, 240, 210
+        degrees = 360 - ((clock_position - 6) * 30)
+    
     return degrees
 
 # Function to get available vessel options (exclude already used ones)
@@ -126,7 +135,22 @@ with col1:
     # Position 0mm from top = y = 100 (top)
     # Position graft_length from top = y = -100 (bottom)
     for i, fen in enumerate(st.session_state.fenestrations):
-        x = (fen['degrees'] / 360) * 160 - 80
+        # Convert degrees to x position
+        # 0 degrees = left edge (-80), 180 degrees = center (0), 360 degrees = right edge (80)
+        # But we want: 9 o'clock (270) = left (-80), 3 o'clock (90) = right (80), 12 o'clock (180) = center
+        deg = fen['degrees']
+        if deg <= 180:
+            x = (deg / 180) * 80  # 0->-80 mapped wrong, let's fix
+        else:
+            x = ((deg - 180) / 180) * (-80)  # 180-360 -> 0 to -80
+        
+        # Simpler approach: map 0-360 to -80 to 80 with 180 at center
+        # x = ((deg - 180) / 180) * 80 but wrapped
+        if deg >= 180:
+            x = -((deg - 180) / 180) * 80  # 180->0, 270->-80, 360->-80
+        else:
+            x = ((180 - deg) / 180) * 80  # 180->0, 90->80, 0->80
+        
         # position from top: 0 -> y=100, graft_length -> y=-100
         y = 100 - (fen['position'] / graft_length) * 200
         
@@ -183,11 +207,11 @@ with col2:
     st.subheader("2D Template (Unwrapped)")
     st.markdown("*Printable template - 12 o'clock at center*")
     
-    # Create 2D template
-    fig2, ax2 = plt.subplots(figsize=(8, 6))
-    
     # Calculate dimensions
     circumference = np.pi * graft_diameter
+    
+    # Create 2D template with equal aspect ratio for round circles
+    fig2, ax2 = plt.subplots(figsize=(10, 8))
     
     # Draw template rectangle
     rect = Rectangle((0, 0), circumference, graft_length, 
@@ -195,14 +219,15 @@ with col2:
     ax2.add_patch(rect)
     
     # Draw clock position markers
-    clock_positions_template = [9, 12, 3, 6]
-    for i, clock_pos in enumerate(clock_positions_template):
-        x = (clock_to_degrees(clock_pos) / 360) * circumference
+    # 6 o'clock = 0 degrees, 3 o'clock = 90, 12 o'clock = 180, 9 o'clock = 270
+    clock_positions_template = [6, 3, 12, 9]
+    clock_degrees = [0, 90, 180, 270]
+    for clock_pos, deg in zip(clock_positions_template, clock_degrees):
+        x = (deg / 360) * circumference
         ax2.axvline(x=x, color='blue', linestyle='--', linewidth=1, alpha=0.5)
         ax2.text(x, graft_length + 3, f"{clock_pos}", fontsize=9, ha='center', color='blue')
     
     # Draw fenestrations
-    # Y=0 is BOTTOM of graft (distal), Y=graft_length is TOP of graft (proximal)
     for i, fen in enumerate(st.session_state.fenestrations):
         x = (fen['degrees'] / 360) * circumference
         # position from top: 0 -> y=graft_length, graft_length -> y=0
@@ -213,11 +238,13 @@ with col2:
         short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
         ax2.text(x + fenestration_size/2 + 2, y, short_name, fontsize=10, fontweight='bold')
     
-    ax2.set_xlim(-5, circumference + 5)
+    # Set equal aspect ratio so circles are round
+    ax2.set_aspect('equal')
+    ax2.set_xlim(-5, circumference + 15)
     ax2.set_ylim(-5, graft_length + 15)
     ax2.set_xlabel('Circumference (mm)')
     ax2.set_ylabel('Distance from Bottom (mm)')
-    ax2.set_title('Printable Template (Top of graft = Top of template)')
+    ax2.set_title('Printable Template')
     ax2.grid(True, alpha=0.3)
     
     st.pyplot(fig2)
@@ -292,8 +319,8 @@ st.info("""
 
 # Download template
 if st.session_state.fenestrations:
-    # Create downloadable template
-    fig_download, ax_download = plt.subplots(figsize=(10, 8))
+    # Create downloadable template with equal aspect ratio
+    fig_download, ax_download = plt.subplots(figsize=(12, 10))
     
     circumference = np.pi * graft_diameter
     rect = Rectangle((0, 0), circumference, graft_length, 
@@ -301,8 +328,8 @@ if st.session_state.fenestrations:
     ax_download.add_patch(rect)
     
     # Add clock markers
-    for clock_pos in [9, 12, 3, 6]:
-        x = (clock_to_degrees(clock_pos) / 360) * circumference
+    for clock_pos, deg in zip([6, 3, 12, 9], [0, 90, 180, 270]):
+        x = (deg / 360) * circumference
         ax_download.axvline(x=x, color='blue', linestyle='--', linewidth=1, alpha=0.5)
         ax_download.text(x, graft_length + 3, f"{clock_pos} o'clock", fontsize=9, ha='center', color='blue')
     
@@ -314,7 +341,8 @@ if st.session_state.fenestrations:
         short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
         ax_download.text(x + fenestration_size/2 + 2, y, short_name, fontsize=10, fontweight='bold')
     
-    ax_download.set_xlim(-5, circumference + 5)
+    ax_download.set_aspect('equal')
+    ax_download.set_xlim(-5, circumference + 15)
     ax_download.set_ylim(-5, graft_length + 15)
     ax_download.set_xlabel('Circumference (mm)')
     ax_download.set_ylabel('Distance from Bottom (mm)')
