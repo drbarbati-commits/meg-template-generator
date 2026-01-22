@@ -40,25 +40,22 @@ VESSEL_SHORT_NAMES = {
     "F5": "F5"
 }
 
-# Function to convert clock position to degrees
-def clock_to_degrees(clock_position):
-    # 12 o'clock = 180 degrees (center/anterior)
-    # 3 o'clock = 90 degrees (left side)
-    # 6 o'clock = 0 degrees (posterior)
-    # 9 o'clock = 270 degrees (right side)
-    # Clock goes clockwise: 12 -> 1 -> 2 -> 3 -> ... -> 11 -> 12
-    # Degrees go: 180 -> 150 -> 120 -> 90 -> 60 -> 30 -> 0 -> 330 -> 300 -> 270 -> 240 -> 210 -> 180
+# Function to convert clock position to degrees for 2D template
+# Template layout: 9 o'clock on LEFT, 12 in CENTER, 3 o'clock on RIGHT
+def clock_to_template_position(clock_position, circumference):
+    # We want: 9=left edge (0), 12=center (circumference/2), 3=right edge (circumference)
+    # Clock positions: 9, 10, 11, 12, 1, 2, 3 map to 0 -> circumference
+    # And 3, 4, 5, 6, 7, 8, 9 wrap around
     
-    if clock_position == 12:
-        degrees = 180
-    elif clock_position <= 6:
-        # 1-6 o'clock: 150, 120, 90, 60, 30, 0
-        degrees = 180 - (clock_position * 30)
+    # Map clock to position where 9=0, 12=0.5, 3=1.0 (as fraction of circumference)
+    if clock_position >= 9:
+        # 9=0, 10=1/12, 11=2/12, 12=3/12
+        fraction = (clock_position - 9) / 12
     else:
-        # 7-11 o'clock: 330, 300, 270, 240, 210
-        degrees = 360 - ((clock_position - 6) * 30)
+        # 1=4/12, 2=5/12, 3=6/12, 4=7/12, 5=8/12, 6=9/12, 7=10/12, 8=11/12
+        fraction = (clock_position + 3) / 12
     
-    return degrees
+    return fraction * circumference
 
 # Function to get available vessel options (exclude already used ones)
 def get_available_vessels():
@@ -106,16 +103,15 @@ with col1:
     ax1.set_ylim(-150, 150)
     ax1.set_aspect('equal')
     
-    # Draw cylinder (simplified 3D view)
     # TOP of graft at y = 100 (top of image)
     # BOTTOM of graft at y = -100 (bottom of image)
     
-    # Top ellipse (proximal end) - at TOP of image
+    # Top ellipse (proximal end)
     ellipse_top = patches.Ellipse((0, 100), 160, 60, linewidth=2, 
                                  edgecolor='black', facecolor='lightblue', alpha=0.3)
     ax1.add_patch(ellipse_top)
     
-    # Bottom ellipse (distal end) - at BOTTOM of image
+    # Bottom ellipse (distal end)
     ellipse_bottom = patches.Ellipse((0, -100), 160, 60, linewidth=2, 
                                    edgecolor='black', facecolor='lightblue', alpha=0.3)
     ax1.add_patch(ellipse_bottom)
@@ -124,32 +120,22 @@ with col1:
     ax1.plot([-80, -80], [-100, 100], 'k-', linewidth=2)
     ax1.plot([80, 80], [-100, 100], 'k-', linewidth=2)
     
-    # Add clock position labels on top ellipse
-    # 12 at top center, 6 at bottom center, 3 and 9 on sides (outside the cylinder)
+    # Clock position labels
     ax1.text(0, 135, "12", fontsize=9, ha='center', va='center', color='blue')
     ax1.text(0, 65, "6", fontsize=9, ha='center', va='center', color='blue')
     ax1.text(-95, 100, "9", fontsize=9, ha='center', va='center', color='blue')
     ax1.text(95, 100, "3", fontsize=9, ha='center', va='center', color='blue')
     
-    # Draw fenestrations
-    # Position 0mm from top = y = 100 (top)
-    # Position graft_length from top = y = -100 (bottom)
+    # Draw fenestrations on 3D view
     for i, fen in enumerate(st.session_state.fenestrations):
-        # Convert degrees to x position
-        # 0 degrees = left edge (-80), 180 degrees = center (0), 360 degrees = right edge (80)
-        # But we want: 9 o'clock (270) = left (-80), 3 o'clock (90) = right (80), 12 o'clock (180) = center
-        deg = fen['degrees']
-        if deg <= 180:
-            x = (deg / 180) * 80  # 0->-80 mapped wrong, let's fix
+        clock = fen['clock']
+        # Map clock to x position: 9=-80, 12=0, 3=80
+        if clock >= 9:
+            x = -80 + ((clock - 9) / 3) * 80  # 9->-80, 12->0
+        elif clock <= 3:
+            x = (clock / 3) * 80  # 0->0, 3->80
         else:
-            x = ((deg - 180) / 180) * (-80)  # 180-360 -> 0 to -80
-        
-        # Simpler approach: map 0-360 to -80 to 80 with 180 at center
-        # x = ((deg - 180) / 180) * 80 but wrapped
-        if deg >= 180:
-            x = -((deg - 180) / 180) * 80  # 180->0, 270->-80, 360->-80
-        else:
-            x = ((180 - deg) / 180) * 80  # 180->0, 90->80, 0->80
+            x = 80 - ((clock - 3) / 6) * 160  # 3->80, 6->0, 9->-80
         
         # position from top: 0 -> y=100, graft_length -> y=-100
         y = 100 - (fen['position'] / graft_length) * 200
@@ -159,21 +145,19 @@ with col1:
         short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
         ax1.text(x + 12, y, short_name, fontsize=10, fontweight='bold')
     
-    # Add labels for top and bottom
+    # Labels
     ax1.text(0, 145, "TOP (Proximal)", fontsize=10, ha='center', color='green', fontweight='bold')
     ax1.text(0, -140, "BOTTOM (Distal)", fontsize=10, ha='center', color='green', fontweight='bold')
     
     ax1.set_title(f"Graft: {graft_diameter}mm x {graft_length}mm")
     ax1.axis('off')
     
-    # Display the plot
     st.pyplot(fig1)
     plt.close(fig1)
     
-    # Manual fenestration input
+    # Fenestration input
     st.markdown("**Add Fenestration:**")
     
-    # Vessel selection
     available_vessels = get_available_vessels()
     new_vessel = st.selectbox(
         "Vessel / Fenestration Name",
@@ -194,23 +178,21 @@ with col1:
         )
     
     if st.button("Add Fenestration"):
-        new_degrees = clock_to_degrees(new_clock)
         st.session_state.fenestrations.append({
             'vessel': new_vessel,
             'position': new_position,
-            'clock': new_clock,
-            'degrees': new_degrees
+            'clock': new_clock
         })
         st.rerun()
 
 with col2:
     st.subheader("2D Template (Unwrapped)")
-    st.markdown("*Printable template - 12 o'clock at center*")
+    st.markdown("*Printable template - 9 o'clock at left, 12 at center, 3 at right*")
     
     # Calculate dimensions
     circumference = np.pi * graft_diameter
     
-    # Create 2D template with equal aspect ratio for round circles
+    # Create 2D template
     fig2, ax2 = plt.subplots(figsize=(10, 8))
     
     # Draw template rectangle
@@ -218,19 +200,33 @@ with col2:
                     linewidth=2, edgecolor='black', facecolor='lightgray', alpha=0.3)
     ax2.add_patch(rect)
     
-    # Draw clock position markers
-    # 6 o'clock = 0 degrees, 3 o'clock = 90, 12 o'clock = 180, 9 o'clock = 270
-    clock_positions_template = [6, 3, 12, 9]
-    clock_degrees = [0, 90, 180, 270]
-    for clock_pos, deg in zip(clock_positions_template, clock_degrees):
-        x = (deg / 360) * circumference
-        ax2.axvline(x=x, color='blue', linestyle='--', linewidth=1, alpha=0.5)
-        ax2.text(x, graft_length + 3, f"{clock_pos}", fontsize=9, ha='center', color='blue')
+    # Draw clock position markers: 9 at left, 12 at center, 3 at right, 6 at edges
+    clock_markers = [
+        (9, 0),                      # 9 o'clock at left edge
+        (12, circumference / 2),     # 12 o'clock at center
+        (3, circumference),          # 3 o'clock at right edge
+        (6, circumference / 4),      # 6 o'clock between 9 and 12
+    ]
+    
+    # Add second 6 o'clock marker on the other side
+    ax2.axvline(x=0, color='blue', linestyle='--', linewidth=1, alpha=0.5)
+    ax2.text(0, graft_length + 5, "9", fontsize=10, ha='center', color='blue', fontweight='bold')
+    
+    ax2.axvline(x=circumference/4, color='blue', linestyle='--', linewidth=1, alpha=0.3)
+    ax2.text(circumference/4, graft_length + 5, "6", fontsize=9, ha='center', color='blue')
+    
+    ax2.axvline(x=circumference/2, color='blue', linestyle='--', linewidth=1, alpha=0.5)
+    ax2.text(circumference/2, graft_length + 5, "12", fontsize=10, ha='center', color='blue', fontweight='bold')
+    
+    ax2.axvline(x=3*circumference/4, color='blue', linestyle='--', linewidth=1, alpha=0.3)
+    ax2.text(3*circumference/4, graft_length + 5, "6", fontsize=9, ha='center', color='blue')
+    
+    ax2.axvline(x=circumference, color='blue', linestyle='--', linewidth=1, alpha=0.5)
+    ax2.text(circumference, graft_length + 5, "3", fontsize=10, ha='center', color='blue', fontweight='bold')
     
     # Draw fenestrations
     for i, fen in enumerate(st.session_state.fenestrations):
-        x = (fen['degrees'] / 360) * circumference
-        # position from top: 0 -> y=graft_length, graft_length -> y=0
+        x = clock_to_template_position(fen['clock'], circumference)
         y = graft_length - fen['position']
         
         circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.7)
@@ -238,7 +234,6 @@ with col2:
         short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
         ax2.text(x + fenestration_size/2 + 2, y, short_name, fontsize=10, fontweight='bold')
     
-    # Set equal aspect ratio so circles are round
     ax2.set_aspect('equal')
     ax2.set_xlim(-5, circumference + 15)
     ax2.set_ylim(-5, graft_length + 15)
@@ -253,7 +248,6 @@ with col2:
 # Fenestration list
 if st.session_state.fenestrations:
     st.subheader("Fenestrations List")
-    # Sort by position from top
     sorted_fens = sorted(enumerate(st.session_state.fenestrations), key=lambda x: x[1]['position'])
     for orig_idx, fen in sorted_fens:
         col_a, col_b = st.columns([4, 1])
@@ -313,13 +307,12 @@ st.info("""
 2. Use standard A4/Letter paper
 3. Sterilize printed template before use
 4. Align 12 o'clock mark with anterior position on graft
-5. Wrap template around actual graft
+5. Wrap template around actual graft (9 o'clock = right side of patient)
 6. Use holes as cutting guides
 """)
 
 # Download template
 if st.session_state.fenestrations:
-    # Create downloadable template with equal aspect ratio
     fig_download, ax_download = plt.subplots(figsize=(12, 10))
     
     circumference = np.pi * graft_diameter
@@ -327,14 +320,18 @@ if st.session_state.fenestrations:
                     linewidth=2, edgecolor='black', facecolor='white')
     ax_download.add_patch(rect)
     
-    # Add clock markers
-    for clock_pos, deg in zip([6, 3, 12, 9], [0, 90, 180, 270]):
-        x = (deg / 360) * circumference
-        ax_download.axvline(x=x, color='blue', linestyle='--', linewidth=1, alpha=0.5)
-        ax_download.text(x, graft_length + 3, f"{clock_pos} o'clock", fontsize=9, ha='center', color='blue')
+    # Clock markers
+    ax_download.axvline(x=0, color='blue', linestyle='--', linewidth=1, alpha=0.5)
+    ax_download.text(0, graft_length + 5, "9 o'clock", fontsize=9, ha='center', color='blue')
+    
+    ax_download.axvline(x=circumference/2, color='blue', linestyle='--', linewidth=1, alpha=0.5)
+    ax_download.text(circumference/2, graft_length + 5, "12 o'clock", fontsize=9, ha='center', color='blue')
+    
+    ax_download.axvline(x=circumference, color='blue', linestyle='--', linewidth=1, alpha=0.5)
+    ax_download.text(circumference, graft_length + 5, "3 o'clock", fontsize=9, ha='center', color='blue')
     
     for i, fen in enumerate(st.session_state.fenestrations):
-        x = (fen['degrees'] / 360) * circumference
+        x = clock_to_template_position(fen['clock'], circumference)
         y = graft_length - fen['position']
         circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.7)
         ax_download.add_patch(circle)
