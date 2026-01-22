@@ -16,7 +16,7 @@ st.set_page_config(
 )
 
 # Logo URL (your uploaded logo)
-LOGO_URL = "https://d41chssnpqdne.cloudfront.net/user_upload_by_module/chat_bot/files/71012469/WiLA8Zq288whTgZe.png?Expires=1770316868&Signature=Q9PcSf7pGrEmSU1x13IPSopBRmuByk-Lit3Gj4J9vQXse5~IM24GPe5nukMgrEOHIUBFJEENACvGq60NsOq1tCWXKEZ2UUx0zav-AACaYUwWJMkfan7LMxKKcMpJz6dY6KcUwKFB-SH5CB1JiCxqzrv7exSPRq6Og~NSqe6fMBCjrEp8xJ~fYf-~hC2bi4fGIKFhswEylyOUGb63uhYaTTpyo2AakM5d~RfYoJFCOgjN9GH6axVrNl5R49NXHjPnURcSPNi6jBwSNk5sCr7V9D4LgHIdYXbE9lPOlHKJi94QmJH7HoKR4jEQYkGZ2mvCSsgtJtVl1vcCHmQB6vVxMw__&Key-Pair-Id=K3USGZIKWMDCSX"
+LOGO_URL = "logo.png"
 
 # Vessel name options
 VESSEL_OPTIONS = [
