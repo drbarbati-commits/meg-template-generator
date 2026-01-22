@@ -89,7 +89,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("3D Graft View")
-    st.markdown("*Add fenestrations using clock positions (12 o'clock = top)*")
+    st.markdown("*Add fenestrations using clock positions (12 o'clock = anterior)*")
     
     # Create 3D-like visualization
     fig1, ax1 = plt.subplots(figsize=(8, 6))
@@ -98,12 +98,15 @@ with col1:
     ax1.set_aspect('equal')
     
     # Draw cylinder (simplified 3D view)
-    # Top ellipse
+    # TOP of graft at y = -100 (top of image)
+    # BOTTOM of graft at y = 100 (bottom of image)
+    
+    # Top ellipse (proximal end)
     ellipse_top = patches.Ellipse((0, -100), 160, 60, linewidth=2, 
                                  edgecolor='black', facecolor='lightblue', alpha=0.3)
     ax1.add_patch(ellipse_top)
     
-    # Bottom ellipse
+    # Bottom ellipse (distal end)
     ellipse_bottom = patches.Ellipse((0, 100), 160, 60, linewidth=2, 
                                    edgecolor='black', facecolor='lightblue', alpha=0.3)
     ax1.add_patch(ellipse_bottom)
@@ -112,22 +115,31 @@ with col1:
     ax1.plot([-80, -80], [-100, 100], 'k-', linewidth=2)
     ax1.plot([80, 80], [-100, 100], 'k-', linewidth=2)
     
-    # Add clock position labels on top ellipse
+    # Add clock position labels on bottom ellipse
     clock_labels = [12, 3, 6, 9]
     clock_x = [0, 80, 0, -80]
-    clock_y = [-130, -100, -70, -100]
+    clock_y = [130, 100, 70, 100]
     for label, x, y in zip(clock_labels, clock_x, clock_y):
         ax1.text(x, y, f"{label}", fontsize=9, ha='center', va='center', color='blue')
     
     # Draw fenestrations
+    # Position 0mm = top of graft (y = -100)
+    # Position graft_length = bottom of graft (y = 100)
     for i, fen in enumerate(st.session_state.fenestrations):
         x = (fen['degrees'] / 360) * 160 - 80
+        # FIXED: position from top maps correctly
+        # position 0 -> y = -100 (top)
+        # position graft_length -> y = 100 (bottom)
         y = -100 + (fen['position'] / graft_length) * 200
         
         circle = Circle((x, y), 8, color='red', alpha=0.7)
         ax1.add_patch(circle)
         short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
         ax1.text(x + 12, y, short_name, fontsize=10, fontweight='bold')
+    
+    # Add labels for top and bottom
+    ax1.text(0, -140, "TOP (Proximal)", fontsize=10, ha='center', color='green')
+    ax1.text(0, 140, "BOTTOM (Distal)", fontsize=10, ha='center', color='green')
     
     ax1.set_title(f"Graft: {graft_diameter}mm x {graft_length}mm")
     ax1.axis('off')
@@ -192,9 +204,12 @@ with col2:
         ax2.text(x, graft_length + 3, f"{clock_pos}", fontsize=9, ha='center', color='blue')
     
     # Draw fenestrations
+    # For 2D template: Y=0 is TOP of graft, Y=graft_length is BOTTOM
+    # So we need to INVERT: y = graft_length - position
     for i, fen in enumerate(st.session_state.fenestrations):
         x = (fen['degrees'] / 360) * circumference
-        y = fen['position']
+        # FIXED: Invert Y so top of graft is at top of template
+        y = graft_length - fen['position']
         
         circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.7)
         ax2.add_patch(circle)
@@ -204,8 +219,8 @@ with col2:
     ax2.set_xlim(-5, circumference + 5)
     ax2.set_ylim(-5, graft_length + 15)
     ax2.set_xlabel('Circumference (mm)')
-    ax2.set_ylabel('Length (mm)')
-    ax2.set_title('Printable Template')
+    ax2.set_ylabel('Distance from BOTTOM (mm)')
+    ax2.set_title('Printable Template (Top of graft = Top of template)')
     ax2.grid(True, alpha=0.3)
     
     st.pyplot(fig2)
@@ -214,13 +229,15 @@ with col2:
 # Fenestration list
 if st.session_state.fenestrations:
     st.subheader("Fenestrations List")
-    for i, fen in enumerate(st.session_state.fenestrations):
+    # Sort by position from top
+    sorted_fens = sorted(enumerate(st.session_state.fenestrations), key=lambda x: x[1]['position'])
+    for orig_idx, fen in sorted_fens:
         col_a, col_b = st.columns([4, 1])
         with col_a:
             st.write(f"**{fen['vessel']}:** Position: {fen['position']:.1f}mm from top, Clock: {fen['clock']} o'clock, Size: {fenestration_size}mm")
         with col_b:
-            if st.button(f"Delete", key=f"del_{i}"):
-                st.session_state.fenestrations.pop(i)
+            if st.button(f"Delete", key=f"del_{orig_idx}"):
+                st.session_state.fenestrations.pop(orig_idx)
                 st.rerun()
 
 # Vessel reference
@@ -294,7 +311,7 @@ if st.session_state.fenestrations:
     
     for i, fen in enumerate(st.session_state.fenestrations):
         x = (fen['degrees'] / 360) * circumference
-        y = fen['position']
+        y = graft_length - fen['position']
         circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.7)
         ax_download.add_patch(circle)
         short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
@@ -303,7 +320,7 @@ if st.session_state.fenestrations:
     ax_download.set_xlim(-5, circumference + 5)
     ax_download.set_ylim(-5, graft_length + 15)
     ax_download.set_xlabel('Circumference (mm)')
-    ax_download.set_ylabel('Length (mm)')
+    ax_download.set_ylabel('Distance from Bottom (mm)')
     ax_download.set_title(f'Graft Template - {graft_diameter}mm x {graft_length}mm')
     ax_download.grid(True, alpha=0.3)
     
