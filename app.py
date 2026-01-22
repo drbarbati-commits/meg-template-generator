@@ -142,18 +142,6 @@ with col1:
                                        facecolor='lightblue', alpha=0.3, zorder=1)
     ax1.add_patch(ellipse_top_fill)
     
-    # Add shading to make it look more 3D
-    # Create gradient effect on the cylinder
-    from matplotlib.patches import FancyBboxPatch
-    # Left side darker (shadow)
-    rect_shadow_left = Rectangle((-80, -100), 20, 200, 
-                                 linewidth=0, facecolor='gray', alpha=0.15, zorder=1.5)
-    ax1.add_patch(rect_shadow_left)
-    # Right side highlight
-    rect_highlight_right = Rectangle((60, -100), 20, 200, 
-                                    linewidth=0, facecolor='white', alpha=0.2, zorder=1.5)
-    ax1.add_patch(rect_highlight_right)
-    
     # Draw top ellipse - TOP HALF (solid line - visible part)
     # Top arc: from 180 to 0 degrees (left to right, upper half)
     arc_top = Arc((0, 100), 160, 60, angle=0, theta1=0, theta2=180, 
@@ -167,7 +155,7 @@ with col1:
     y_bottom = 100 + 30 * np.sin(theta)
     ax1.plot(x_bottom, y_bottom, 'k:', linewidth=2, alpha=0.6, zorder=2)
     
-    # Draw cylinder body (sides) with slight gradient
+    # Draw cylinder body (sides)
     ax1.plot([-80, -80], [-100, 100], 'k-', linewidth=2.5, zorder=2)
     ax1.plot([80, 80], [-100, 100], 'k-', linewidth=2.5, zorder=2)
     
@@ -218,8 +206,9 @@ with col1:
             
             y = 100 - (fen['position'] / graft_length) * 200
             
-            # Scale fenestration size accurately
-            fen_radius_scaled = (fenestration_size / 2) * scale_factor
+            # Use the stored fenestration size for this specific fenestration
+            fen_size = fen.get('size', 6)  # Default to 6 if not stored (backward compatibility)
+            fen_radius_scaled = (fen_size / 2) * scale_factor
             
             # 50% transparency for fenestrations behind the graft
             circle = Circle((x, y), fen_radius_scaled, color='red', alpha=0.35, zorder=3)
@@ -252,8 +241,9 @@ with col1:
             
             y = 100 - (fen['position'] / graft_length) * 200
             
-            # Scale fenestration size accurately
-            fen_radius_scaled = (fenestration_size / 2) * scale_factor
+            # Use the stored fenestration size for this specific fenestration
+            fen_size = fen.get('size', 6)  # Default to 6 if not stored (backward compatibility)
+            fen_radius_scaled = (fen_size / 2) * scale_factor
             
             # Full opacity for fenestrations in front
             circle = Circle((x, y), fen_radius_scaled, color='red', alpha=0.7, zorder=5)
@@ -302,7 +292,8 @@ with col1:
         st.session_state.fenestrations.append({
             'vessel': new_vessel,
             'position': new_position,
-            'clock': new_clock
+            'clock': new_clock,
+            'size': fenestration_size  # Store the size with each fenestration
         })
         st.rerun()
 
@@ -342,11 +333,12 @@ with col2:
         x = x_frac * circumference
         y = fen['position']
         
-        # Use actual fenestration size in mm
-        circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.7)
+        # Use the stored fenestration size for this specific fenestration
+        fen_size = fen.get('size', 6)  # Default to 6 if not stored (backward compatibility)
+        circle = Circle((x, y), fen_size/2, color='red', alpha=0.7)
         ax2.add_patch(circle)
         short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
-        ax2.text(x + fenestration_size/2 + 2, y, short_name, fontsize=10, fontweight='bold')
+        ax2.text(x + fen_size/2 + 2, y, short_name, fontsize=10, fontweight='bold')
     
     ax2.set_aspect('equal')
     ax2.set_xlim(-5, circumference + 10)
@@ -373,7 +365,8 @@ if st.session_state.fenestrations:
         col_a, col_b = st.columns([4, 1])
         with col_a:
             behind_text = " (Behind graft)" if is_behind_graft(fen['clock']) else ""
-            st.write(f"**{fen['vessel']}:** Position: {fen['position']:.1f}mm from top, Clock: {fen['clock']} o'clock, Size: {fenestration_size}mm{behind_text}")
+            fen_size = fen.get('size', 6)  # Get stored size
+            st.write(f"**{fen['vessel']}:** Position: {fen['position']:.1f}mm from top, Clock: {fen['clock']} o'clock, Size: {fen_size}mm{behind_text}")
         with col_b:
             if st.button(f"Delete", key=f"del_{orig_idx}"):
                 st.session_state.fenestrations.pop(orig_idx)
@@ -448,11 +441,12 @@ if st.session_state.fenestrations:
         x_frac = clock_to_x_fraction(fen['clock'])
         x = x_frac * circumference
         y = fen['position']
-        # Use actual fenestration size in mm
-        circle = Circle((x, y), fenestration_size/2, color='red', alpha=0.7)
+        # Use the stored fenestration size for this specific fenestration
+        fen_size = fen.get('size', 6)
+        circle = Circle((x, y), fen_size/2, color='red', alpha=0.7)
         ax_download.add_patch(circle)
         short_name = VESSEL_SHORT_NAMES.get(fen['vessel'], fen['vessel'])
-        ax_download.text(x + fenestration_size/2 + 2, y, short_name, fontsize=10, fontweight='bold')
+        ax_download.text(x + fen_size/2 + 2, y, short_name, fontsize=10, fontweight='bold')
     
     ax_download.set_aspect('equal')
     ax_download.set_xlim(-5, circumference + 10)
