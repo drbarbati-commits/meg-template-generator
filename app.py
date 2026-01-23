@@ -44,7 +44,7 @@ VESSEL_SHORT_NAMES = {
     "F5": "F5"
 }
 
-# Function to convert clock position to X fraction on template
+# Function to convert clock position to X fraction on template (REVERSED for radiological view)
 def clock_to_x_fraction(clock_position):
     if clock_position == 6:
         return 0.0
@@ -127,6 +127,7 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("3D Graft View")
     st.markdown("*Add fenestrations using clock positions (12 o'clock = anterior)*")
+    st.markdown("*Radiological view: 9 o'clock = Patient's Right, 3 o'clock = Patient's Left*")
     
     fig1, ax1 = plt.subplots(figsize=(8, 7))
     ax1.set_xlim(-150, 160)
@@ -164,11 +165,11 @@ with col1:
                                    edgecolor='black', facecolor='lightblue', alpha=0.3, zorder=2)
     ax1.add_patch(ellipse_bottom)
     
-    # Clock position labels
+    # Clock position labels - REVERSED (radiological view)
     ax1.text(0, 135, "12", fontsize=9, ha='center', va='center', color='blue', zorder=10)
     ax1.text(0, 65, "6", fontsize=9, ha='center', va='center', color='blue', zorder=10)
-    ax1.text(-95, 100, "9", fontsize=9, ha='center', va='center', color='blue', zorder=10)
-    ax1.text(95, 100, "3", fontsize=9, ha='center', va='center', color='blue', zorder=10)
+    ax1.text(95, 100, "9", fontsize=9, ha='center', va='center', color='blue', zorder=10)  # 9 on RIGHT
+    ax1.text(-95, 100, "3", fontsize=9, ha='center', va='center', color='blue', zorder=10)  # 3 on LEFT
     
     # Y-axis labels (distance from top) - dotted lines extend to numbers
     y_ticks = [0, graft_length//4, graft_length//2, 3*graft_length//4, graft_length]
@@ -185,22 +186,23 @@ with col1:
     for i, fen in enumerate(st.session_state.fenestrations):
         if is_behind_graft(fen['clock']):
             clock = fen['clock']
+            # REVERSED X-coordinates for radiological view
             if clock == 12:
                 x = 0
             elif clock == 9:
-                x = -80
+                x = 80  # 9 on RIGHT side
             elif clock == 3:
-                x = 80
+                x = -80  # 3 on LEFT side
             elif clock == 6:
                 x = 0
             elif clock in [10, 11]:
-                x = -80 + (clock - 9) * (80 / 3)
+                x = 80 - (clock - 9) * (80 / 3)  # Moving left from 9
             elif clock in [1, 2]:
-                x = clock * (80 / 3)
+                x = 80 - (clock + 3) * (80 / 3)  # Moving left from 12
             elif clock in [4, 5]:
-                x = 80 - (clock - 3) * (80 / 3)
+                x = -80 + (clock - 3) * (80 / 3)  # Moving right from 3
             elif clock in [7, 8]:
-                x = -80 + (9 - clock) * (80 / 3)
+                x = 80 - (9 - clock) * (80 / 3)  # Moving right from 6
             else:
                 x = 0
             
@@ -220,22 +222,23 @@ with col1:
     for i, fen in enumerate(st.session_state.fenestrations):
         if not is_behind_graft(fen['clock']):
             clock = fen['clock']
+            # REVERSED X-coordinates for radiological view
             if clock == 12:
                 x = 0
             elif clock == 9:
-                x = -80
+                x = 80  # 9 on RIGHT side
             elif clock == 3:
-                x = 80
+                x = -80  # 3 on LEFT side
             elif clock == 6:
                 x = 0
             elif clock in [10, 11]:
-                x = -80 + (clock - 9) * (80 / 3)
+                x = 80 - (clock - 9) * (80 / 3)  # Moving left from 9
             elif clock in [1, 2]:
-                x = clock * (80 / 3)
+                x = 80 - (clock + 3) * (80 / 3)  # Moving left from 12
             elif clock in [4, 5]:
-                x = 80 - (clock - 3) * (80 / 3)
+                x = -80 + (clock - 3) * (80 / 3)  # Moving right from 3
             elif clock in [7, 8]:
-                x = -80 + (9 - clock) * (80 / 3)
+                x = 80 - (9 - clock) * (80 / 3)  # Moving right from 6
             else:
                 x = 0
             
@@ -254,7 +257,7 @@ with col1:
     ax1.text(0, 150, "TOP (Proximal) - 0mm", fontsize=10, ha='center', color='green', fontweight='bold', zorder=10)
     ax1.text(0, -145, f"BOTTOM (Distal) - {graft_length}mm", fontsize=10, ha='center', color='green', fontweight='bold', zorder=10)
     
-    ax1.set_title(f"Graft: {graft_diameter}mm x {graft_length}mm")
+    ax1.set_title(f"Graft: {graft_diameter}mm x {graft_length}mm (Radiological View)")
     ax1.set_aspect('equal')
     ax1.axis('off')
     
@@ -285,7 +288,7 @@ with col1:
             "Clock Position",
             [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
             index=0,
-            help="12 o'clock = anterior (front), 6 o'clock = posterior (back)"
+            help="12 o'clock = anterior (front), 6 o'clock = posterior (back), 9 = Patient's Right, 3 = Patient's Left"
         )
     
     if st.button("Add Fenestration"):
@@ -393,15 +396,18 @@ with col_ref2:
     """)
 
 # Clock position reference
-st.subheader("🕐 Clock Position Reference")
+st.subheader("🕐 Clock Position Reference (Radiological View)")
 st.markdown("""
 **Template Layout (left to right):**
 
 | 6 | 7 | 8 | 9 | 10 | 11 | **12** | 1 | 2 | 3 | 4 | 5 | 6 |
 |---|---|---|---|----|----|--------|---|---|---|---|---|---|
-| Posterior | | | Right | | | **Anterior** | | | Left | | | Posterior |
+| Posterior | | | **Patient's Right** | | | **Anterior** | | | **Patient's Left** | | | Posterior |
 
-**Note:** Fenestrations at positions 4, 5, 6, 7, 8 o'clock appear behind the graft (shown with reduced opacity)
+**Note:** 
+- Fenestrations at positions 4, 5, 6, 7, 8 o'clock appear behind the graft (shown with reduced opacity)
+- 9 o'clock = Patient's Right side (like CT scan view)
+- 3 o'clock = Patient's Left side (like CT scan view)
 """)
 
 # Print instructions
@@ -413,8 +419,9 @@ st.info("""
 4. Template shows FULL circumference (can be wrapped around graft)
 5. Y-axis: 0 = TOP of graft (proximal), increasing downward
 6. 12 o'clock (center) = Anterior (front of patient)
-7. 6 o'clock (edges) = Posterior (back of patient)
-8. All measurements are in millimeters (1:1 scale)
+7. 9 o'clock = Patient's Right, 3 o'clock = Patient's Left (radiological view)
+8. 6 o'clock (edges) = Posterior (back of patient)
+9. All measurements are in millimeters (1:1 scale)
 """)
 
 # Download template
@@ -453,12 +460,13 @@ if st.session_state.fenestrations:
     ax_download.set_ylim(graft_length + 10, -15)
     ax_download.set_xlabel('Circumference (mm)')
     ax_download.set_ylabel('Distance from Top (mm)')
-    ax_download.set_title(f'Graft Template - {graft_diameter}mm x {graft_length}mm - SCALE 1:1 - Print at 100%')
+    ax_download.set_title(f'Graft Template - {graft_diameter}mm x {graft_length}mm - SCALE 1:1 - Print at 100% (Radiological View)')
     ax_download.grid(True, alpha=0.3)
     
     # Add scale verification marks
     ax_download.text(5, graft_length + 5, f"Circumference: {circumference:.1f}mm", fontsize=9, color='red', fontweight='bold')
     ax_download.text(5, graft_length + 8, f"Graft: {graft_diameter}mm diameter x {graft_length}mm length", fontsize=9, color='blue')
+    ax_download.text(5, -12, "9=Patient's Right, 3=Patient's Left (Radiological View)", fontsize=8, color='purple', style='italic')
     
     # Add logo to downloaded PDF - half size with 50% transparency
     if logo_img is not None:
